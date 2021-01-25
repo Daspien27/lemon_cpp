@@ -247,7 +247,11 @@ int SetUnion(char*, char*);    /* A <- A U B, thru element N */
 ** Principal data structures for the LEMON parser generator.
 */
 
-typedef enum { LEMON_FALSE = 0, LEMON_TRUE } Boolean;
+enum Boolean
+{ 
+    LEMON_FALSE = 0, 
+    LEMON_TRUE  = 1
+};
 
 /* Symbols (terminals and nonterminals) of the grammar are stored
 ** in the following: */
@@ -2338,12 +2342,12 @@ static void parseonetoken(struct pstate* psp)
                 psp->errorcnt++;
             }
             else if (strcmp(x, "{NEVER-REDUCE") == 0) {
-                psp->prevrule->neverReduce = 1;
+                psp->prevrule->neverReduce = Boolean::LEMON_TRUE;
             }
             else {
                 psp->prevrule->line = psp->tokenlineno;
                 psp->prevrule->code = &x[1];
-                psp->prevrule->noCode = 0;
+                psp->prevrule->noCode = Boolean::LEMON_FALSE;
             }
         }
         else if (x[0] == '[') {
@@ -2462,7 +2466,7 @@ static void parseonetoken(struct pstate* psp)
                 rp->lhsalias = psp->lhsalias;
                 rp->nrhs = psp->nrhs;
                 rp->code = 0;
-                rp->noCode = 1;
+                rp->noCode = Boolean::LEMON_TRUE;
                 rp->precsym = 0;
                 rp->index = psp->gp->nrule++;
                 rp->nextlhs = rp->lhs->rule;
@@ -4006,10 +4010,10 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
         static char newlinestr[2] = { '\n', '\0' };
         rp->code = newlinestr;
         rp->line = rp->ruleline;
-        rp->noCode = 1;
+        rp->noCode = Boolean::LEMON_TRUE;
     }
     else {
-        rp->noCode = 0;
+        rp->noCode = Boolean::LEMON_FALSE;
     }
 
 
@@ -4026,7 +4030,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
             append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
                 rp->rhs[0]->index, 1 - rp->nrhs);
             rp->codePrefix = Strsafe(append_str(0, 0, 0, 0));
-            rp->noCode = 0;
+            rp->noCode = Boolean::LEMON_FALSE;
         }
     }
     else if (rp->lhsalias == 0) {
@@ -4186,7 +4190,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
     cp = append_str(0, 0, 0, 0);
     if (cp && cp[0]) {
         rp->codeSuffix = Strsafe(cp);
-        rp->noCode = 0;
+        rp->noCode = Boolean::LEMON_FALSE;
     }
 
     return rc;
@@ -4444,6 +4448,7 @@ static void writeRuleText(FILE* out, struct rule* rp) {
     }
 }
 
+char INCLUDE_BUFFER[] = "";
 
 /* Generate C source code for the parser */
 void ReportTable(
@@ -4466,7 +4471,7 @@ void ReportTable(
     int mnTknOfst, mxTknOfst;
     int mnNtOfst, mxNtOfst;
     struct axset* ax;
-    char* prefix;
+    const char* prefix;
 
     lemp->minShiftReduce = lemp->nstate;
     lemp->errAction = lemp->minShiftReduce + lemp->nrule;
@@ -4566,7 +4571,7 @@ void ReportTable(
     /* The first %include directive begins with a C-language comment,
     ** then skip over the header comment of the template file
     */
-    if (lemp->include == 0) lemp->include = "";
+    if (lemp->include == 0) lemp->include = INCLUDE_BUFFER;
     for (i = 0; ISSPACE(lemp->include[i]); i++) {
         if (lemp->include[i] == '\n') {
             lemp->include += i + 1;
@@ -4591,7 +4596,7 @@ void ReportTable(
 
     /* Generate #defines for all tokens */
     if (lemp->tokenprefix) prefix = lemp->tokenprefix;
-    else                    prefix = "";
+    else                   prefix = "";
     if (mhflag) {
         fprintf(out, "#if INTERFACE\n"); lineno++;
     }
@@ -4749,7 +4754,7 @@ void ReportTable(
     for (i = 0; i < lemp->nxstate; i++) {
         for (ap = lemp->sorted[i]->ap; ap; ap = ap->next) {
             if (ap->type == REDUCE || ap->type == SHIFTREDUCE) {
-                ap->x.rp->doesReduce = 1;
+                ap->x.rp->doesReduce = Boolean::LEMON_TRUE;
             }
         }
     }
@@ -5072,12 +5077,12 @@ void ReportTable(
                 fprintf(out, "      case %d: /* ", rp2->iRule);
                 writeRuleText(out, rp2);
                 fprintf(out, " */ yytestcase(yyruleno==%d);\n", rp2->iRule); lineno++;
-                rp2->codeEmitted = 1;
+                rp2->codeEmitted = Boolean::LEMON_TRUE;
             }
         }
         emit_code(out, rp, lemp, &lineno);
         fprintf(out, "        break;\n"); lineno++;
-        rp->codeEmitted = 1;
+        rp->codeEmitted = Boolean::LEMON_TRUE;
     }
     /* Finally, output the default: rule.  We choose as the default: all
     ** empty actions. */

@@ -18,14 +18,14 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="lemon.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="lempar.c">
       <Filter>Supplemental Files</Filter>
     </ClCompile>
     <ClCompile Include="lemon_original.c">
       <Filter>Supplemental Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lemon.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
