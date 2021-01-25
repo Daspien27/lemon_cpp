@@ -444,7 +444,7 @@ struct lemon {
     char* argv0;             /* Name of the program */
 };
 
-#define MemoryCheck(X) if((X)==0){ \
+#define MemoryCheck(X) if((X)==nullptr){ \
   extern void memory_error(); \
   memory_error(); \
 }
@@ -503,19 +503,19 @@ void Configtable_clear(int(*)(struct config*));
 
 /* Allocate a new parser action */
 static struct action* Action_new(void) {
-    static struct action* actionfreelist = 0;
+    static struct action* actionfreelist = nullptr;
     struct action* newaction;
 
-    if (actionfreelist == 0) {
+    if (actionfreelist == nullptr) {
         int i;
         int amt = 100;
         actionfreelist = (struct action*)calloc(amt, sizeof(struct action));
-        if (actionfreelist == 0) {
+        if (actionfreelist == nullptr) {
             fprintf(stderr, "Unable to allocate memory for a new parser action.");
             exit(1);
         }
         for (i = 0; i < amt - 1; i++) actionfreelist[i].next = &actionfreelist[i + 1];
-        actionfreelist[amt - 1].next = 0;
+        actionfreelist[amt - 1].next = nullptr;
     }
     newaction = actionfreelist;
     actionfreelist = actionfreelist->next;
@@ -565,7 +565,7 @@ void Action_add(
     *app = newaction;
     newaction->type = type;
     newaction->sp = sp;
-    newaction->spOpt = 0;
+    newaction->spOpt = nullptr;
     if (type == SHIFT) {
         newaction->x.stp = (struct state*)arg;
     }
@@ -637,7 +637,7 @@ void acttab_free(acttab* p) {
 /* Allocate a new acttab structure */
 acttab* acttab_alloc(int nsymbol, int nterminal) {
     acttab* p = (acttab*)calloc(1, sizeof(*p));
-    if (p == 0) {
+    if (p == nullptr) {
         fprintf(stderr, "Unable to allocate memory for a new acttab.");
         exit(1);
     }
@@ -657,7 +657,7 @@ void acttab_action(acttab* p, int lookahead, int action) {
         p->nLookaheadAlloc += 25;
         p->aLookahead = (struct lookahead_action*)realloc(p->aLookahead,
             sizeof(p->aLookahead[0]) * p->nLookaheadAlloc);
-        if (p->aLookahead == 0) {
+        if (p->aLookahead == nullptr) {
             fprintf(stderr, "malloc failed\n");
             exit(1);
         }
@@ -708,7 +708,7 @@ int acttab_insert(acttab* p, int makeItSafe) {
         p->nActionAlloc = p->nAction + n + p->nActionAlloc + 20;
         p->aAction = (struct lookahead_action*)realloc(p->aAction,
             sizeof(p->aAction[0]) * p->nActionAlloc);
-        if (p->aAction == 0) {
+        if (p->aAction == nullptr) {
             fprintf(stderr, "malloc failed\n");
             exit(1);
         }
@@ -828,7 +828,7 @@ void FindRulePrecedences(struct lemon* xp)
 {
     struct rule* rp;
     for (rp = xp->rule; rp; rp = rp->next) {
-        if (rp->precsym == 0) {
+        if (rp->precsym == nullptr) {
             int i, j;
             for (i = 0; i < rp->nrhs && rp->precsym == 0; i++) {
                 struct symbol* sp = rp->rhs[i];
@@ -930,7 +930,7 @@ void FindStates(struct lemon* lemp)
     /* Find the start symbol */
     if (lemp->start) {
         sp = Symbol_find(lemp->start);
-        if (sp == 0) {
+        if (sp == nullptr) {
             ErrorMsg(lemp->filename, 0,
                 "The specified start symbol \"%s\" is not "
                 "in a nonterminal of the grammar.  \"%s\" will be used as the start "
@@ -1000,7 +1000,7 @@ PRIVATE struct state* getstate(struct lemon* lemp)
         for (x = bp, y = stp->bp; x && y; x = x->bp, y = y->bp) {
             Plink_copy(&y->bplp, x->bplp);
             Plink_delete(x->fplp);
-            x->fplp = x->bplp = 0;
+            x->fplp = x->bplp = nullptr;
         }
         cfp = Configlist_return();
         Configlist_eat(cfp);
@@ -1015,7 +1015,7 @@ PRIVATE struct state* getstate(struct lemon* lemp)
         stp->bp = bp;                /* Remember the configuration basis */
         stp->cfp = cfp;              /* Remember the configuration closure */
         stp->statenum = lemp->nstate++; /* Every state gets a sequence number */
-        stp->ap = 0;                 /* No actions, yet. */
+        stp->ap = nullptr;                 /* No actions, yet. */
         State_insert(stp, stp->bp);   /* Add to the state table */
         buildshifts(lemp, stp);       /* Recursively compute successor states */
     }
@@ -1196,7 +1196,7 @@ void FindActions(struct lemon* lemp)
     /* Add the accepting token */
     if (lemp->start) {
         sp = Symbol_find(lemp->start);
-        if (sp == 0) sp = lemp->startRule->lhs;
+        if (sp == nullptr) sp = lemp->startRule->lhs;
     }
     else {
         sp = lemp->startRule->lhs;
@@ -1263,7 +1263,7 @@ static int resolve_conflict(
     if (apx->type == SHIFT && apy->type == REDUCE) {
         spx = apx->sp;
         spy = apy->x.rp->precsym;
-        if (spy == 0 || spx->prec < 0 || spy->prec < 0) {
+        if (spy == nullptr || spx->prec < 0 || spy->prec < 0) {
             /* Not enough precedence information. */
             apy->type = SRCONFLICT;
             errcnt++;
@@ -1288,7 +1288,7 @@ static int resolve_conflict(
     else if (apx->type == REDUCE && apy->type == REDUCE) {
         spx = apx->x.rp->precsym;
         spy = apy->x.rp->precsym;
-        if (spx == 0 || spy == 0 || spx->prec < 0 ||
+        if (spx == nullptr || spy == nullptr || spx->prec < 0 ||
             spy->prec < 0 || spx->prec == spy->prec) {
             apy->type = RRCONFLICT;
             errcnt++;
@@ -1325,25 +1325,25 @@ static int resolve_conflict(
 ** in the LEMON parser generator.
 */
 
-static struct config* freelist = 0;      /* List of free configurations */
-static struct config* current = 0;       /* Top of list of configurations */
-static struct config** currentend = 0;   /* Last on list of configs */
-static struct config* basis = 0;         /* Top of list of basis configs */
-static struct config** basisend = 0;     /* End of list of basis configs */
+static struct config* freelist = nullptr;      /* List of free configurations */
+static struct config* current = nullptr;       /* Top of list of configurations */
+static struct config** currentend = nullptr;   /* Last on list of configs */
+static struct config* basis = nullptr;         /* Top of list of basis configs */
+static struct config** basisend = nullptr;     /* End of list of basis configs */
 
 /* Return a pointer to a new configuration */
 PRIVATE struct config* newconfig(void) {
     struct config* newcfg;
-    if (freelist == 0) {
+    if (freelist == nullptr) {
         int i;
         int amt = 3;
         freelist = (struct config*)calloc(amt, sizeof(struct config));
-        if (freelist == 0) {
+        if (freelist == nullptr) {
             fprintf(stderr, "Unable to allocate memory for a new configuration.");
             exit(1);
         }
         for (i = 0; i < amt - 1; i++) freelist[i].next = &freelist[i + 1];
-        freelist[amt - 1].next = 0;
+        freelist[amt - 1].next = nullptr;
     }
     newcfg = freelist;
     freelist = freelist->next;
@@ -1359,9 +1359,9 @@ PRIVATE void deleteconfig(struct config* old)
 
 /* Initialized the configuration list builder */
 void Configlist_init(void) {
-    current = 0;
+    current = nullptr;
     currentend = &current;
-    basis = 0;
+    basis = nullptr;
     basisend = &basis;
     Configtable_init();
     return;
@@ -1369,11 +1369,11 @@ void Configlist_init(void) {
 
 /* Initialized the configuration list builder */
 void Configlist_reset(void) {
-    current = 0;
+    current = nullptr;
     currentend = &current;
-    basis = 0;
+    basis = nullptr;
     basisend = &basis;
-    Configtable_clear(0);
+    Configtable_clear(nullptr);
     return;
 }
 
@@ -1384,19 +1384,19 @@ struct config* Configlist_add(
 ) {
     struct config* cfp, model;
 
-    assert(currentend != 0);
+    assert(currentend != nullptr);
     model.rp = rp;
     model.dot = dot;
     cfp = Configtable_find(&model);
-    if (cfp == 0) {
+    if (cfp == nullptr) {
         cfp = newconfig();
         cfp->rp = rp;
         cfp->dot = dot;
         cfp->fws = SetNew();
-        cfp->stp = 0;
-        cfp->fplp = cfp->bplp = 0;
-        cfp->next = 0;
-        cfp->bp = 0;
+        cfp->stp = nullptr;
+        cfp->fplp = cfp->bplp = nullptr;
+        cfp->next = nullptr;
+        cfp->bp = nullptr;
         *currentend = cfp;
         currentend = &cfp->next;
         Configtable_insert(cfp);
@@ -1409,20 +1409,20 @@ struct config* Configlist_addbasis(struct rule* rp, int dot)
 {
     struct config* cfp, model;
 
-    assert(basisend != 0);
-    assert(currentend != 0);
+    assert(basisend != nullptr);
+    assert(currentend != nullptr);
     model.rp = rp;
     model.dot = dot;
     cfp = Configtable_find(&model);
-    if (cfp == 0) {
+    if (cfp == nullptr) {
         cfp = newconfig();
         cfp->rp = rp;
         cfp->dot = dot;
         cfp->fws = SetNew();
-        cfp->stp = 0;
-        cfp->fplp = cfp->bplp = 0;
-        cfp->next = 0;
-        cfp->bp = 0;
+        cfp->stp = nullptr;
+        cfp->fplp = cfp->bplp = nullptr;
+        cfp->next = nullptr;
+        cfp->bp = nullptr;
         *currentend = cfp;
         currentend = &cfp->next;
         *basisend = cfp;
@@ -1440,14 +1440,14 @@ void Configlist_closure(struct lemon* lemp)
     struct symbol* sp, * xsp;
     int i, dot;
 
-    assert(currentend != 0);
+    assert(currentend != nullptr);
     for (cfp = current; cfp; cfp = cfp->next) {
         rp = cfp->rp;
         dot = cfp->dot;
         if (dot >= rp->nrhs) continue;
         sp = rp->rhs[dot];
         if (sp->type == NONTERMINAL) {
-            if (sp->rule == 0 && sp != lemp->errsym) {
+            if (sp->rule == nullptr && sp != lemp->errsym) {
                 ErrorMsg(lemp->filename, rp->line, "Nonterminal \"%s\" has no rules.",
                     sp->name);
                 lemp->errorcnt++;
@@ -1483,7 +1483,7 @@ void Configlist_closure(struct lemon* lemp)
 void Configlist_sort(void) {
     current = (struct config*)msort((char*)current, (char**)&(current->next),
         Configcmp);
-    currentend = 0;
+    currentend = nullptr;
     return;
 }
 
@@ -1491,7 +1491,7 @@ void Configlist_sort(void) {
 void Configlist_sortbasis(void) {
     basis = (struct config*)msort((char*)current, (char**)&(current->bp),
         Configcmp);
-    basisend = 0;
+    basisend = nullptr;
     return;
 }
 
@@ -1500,8 +1500,8 @@ void Configlist_sortbasis(void) {
 struct config* Configlist_return(void) {
     struct config* old;
     old = current;
-    current = 0;
-    currentend = 0;
+    current = nullptr;
+    currentend = nullptr;
     return old;
 }
 
@@ -1510,8 +1510,8 @@ struct config* Configlist_return(void) {
 struct config* Configlist_basis(void) {
     struct config* old;
     old = basis;
-    basis = 0;
-    basisend = 0;
+    basis = nullptr;
+    basisend = nullptr;
     return old;
 }
 
@@ -1521,8 +1521,8 @@ void Configlist_eat(struct config* cfp)
     struct config* nextcfp;
     for (; cfp; cfp = nextcfp) {
         nextcfp = cfp->next;
-        assert(cfp->fplp == 0);
-        assert(cfp->bplp == 0);
+        assert(cfp->fplp == nullptr);
+        assert(cfp->bplp == nullptr);
         if (cfp->fws) SetFree(cfp->fws);
         deleteconfig(cfp);
     }
@@ -1555,7 +1555,7 @@ void memory_error(void) {
 }
 
 static int nDefine = 0;      /* Number of -D options on the command line */
-static char** azDefine = 0;  /* Name of the -D macros */
+static char** azDefine = nullptr;  /* Name of the -D macros */
 
 /* This routine is called with the argument to each -D command-line option.
 ** Add the macro defined to the azDefine array.
@@ -1564,13 +1564,13 @@ static void handle_D_option(char* z) {
     char** paz;
     nDefine++;
     azDefine = (char**)realloc(azDefine, sizeof(azDefine[0]) * nDefine);
-    if (azDefine == 0) {
+    if (azDefine == nullptr) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
     paz = &azDefine[nDefine - 1];
     *paz = (char*)malloc(lemonStrlen(z) + 1);
-    if (*paz == 0) {
+    if (*paz == nullptr) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
@@ -1584,7 +1584,7 @@ static void handle_D_option(char* z) {
 static char* outputDir = NULL;
 static void handle_d_option(char* z) {
     outputDir = (char*)malloc(lemonStrlen(z) + 1);
-    if (outputDir == 0) {
+    if (outputDir == nullptr) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
@@ -1594,7 +1594,7 @@ static void handle_d_option(char* z) {
 static char* user_templatename = NULL;
 static void handle_T_option(char* z) {
     user_templatename = (char*)malloc(lemonStrlen(z) + 1);
-    if (user_templatename == 0) {
+    if (user_templatename == nullptr) {
         memory_error();
     }
     lemon_strcpy(user_templatename, z);
@@ -1602,7 +1602,7 @@ static void handle_T_option(char* z) {
 
 /* Merge together to lists of rules ordered by rule.iRule */
 static struct rule* Rule_merge(struct rule* pA, struct rule* pB) {
-    struct rule* pFirst = 0;
+    struct rule* pFirst = nullptr;
     struct rule** ppPrev = &pFirst;
     while (pA && pB) {
         if (pA->iRule < pB->iRule) {
@@ -1635,7 +1635,7 @@ static struct rule* Rule_sort(struct rule* rp) {
     memset(x, 0, sizeof(x));
     while (rp) {
         pNext = rp->next;
-        rp->next = 0;
+        rp->next = nullptr;
         for (i = 0; i < sizeof(x) / sizeof(x[0]) - 1 && x[i]; i++) {
             rp = Rule_merge(x[i], rp);
             x[i] = 0;
@@ -1643,7 +1643,7 @@ static struct rule* Rule_sort(struct rule* rp) {
         x[i] = rp;
         rp = pNext;
     }
-    rp = 0;
+    rp = nullptr;
     for (i = 0; i < sizeof(x) / sizeof(x[0]); i++) {
         rp = Rule_merge(x[i], rp);
     }
@@ -1888,10 +1888,10 @@ static char* merge(
 ) {
     char* ptr, * head;
 
-    if (a == 0) {
+    if (a == nullptr) {
         head = b;
     }
-    else if (b == 0) {
+    else if (b == nullptr) {
         head = a;
     }
     else {
@@ -1950,14 +1950,14 @@ static char* msort(
     while (list) {
         ep = list;
         list = NEXT(list);
-        NEXT(ep) = 0;
+        NEXT(ep) = nullptr;
         for (i = 0; i < LISTSIZE - 1 && set[i] != 0; i++) {
             ep = merge(ep, set[i], cmp, offset);
             set[i] = 0;
         }
         set[i] = ep;
     }
-    ep = 0;
+    ep = nullptr;
     for (i = 0; i < LISTSIZE; i++) if (set[i]) ep = merge(set[i], ep, cmp, offset);
     return ep;
 }
@@ -1999,7 +1999,7 @@ static int argindex(int n)
 {
     int i;
     int dashdash = 0;
-    if (g_argv != 0 && *g_argv != 0) {
+    if (g_argv != nullptr && *g_argv != nullptr) {
         for (i = 1; g_argv[i]; i++) {
             if (dashdash || !ISOPT(g_argv[i])) {
                 if (n == 0) return i;
@@ -2025,14 +2025,14 @@ static int handleflags(int i, FILE* err)
         if (strncmp(&g_argv[i][1], op[j].label, lemonStrlen(op[j].label)) == 0) break;
     }
     v = g_argv[i][0] == '-' ? 1 : 0;
-    if (op[j].label == 0) {
+    if (op[j].label == nullptr) {
         if (err) {
             fprintf(err, "%sundefined option.\n", emsg);
             errline(i, 1, err);
         }
         errcnt++;
     }
-    else if (op[j].arg == 0) {
+    else if (op[j].arg == nullptr) {
         /* Ignore this option */
     }
     else if (op[j].type == OPT_FLAG) {
@@ -2061,18 +2061,18 @@ static int handleswitch(int i, FILE* err)
 {
     int lv = 0;
     double dv = 0.0;
-    char* sv = 0, * end;
+    char* sv = nullptr, * end;
     char* cp;
     int j;
     int errcnt = 0;
     cp = strchr(g_argv[i], '=');
-    assert(cp != 0);
+    assert(cp != nullptr);
     *cp = 0;
     for (j = 0; op[j].label; j++) {
         if (strcmp(g_argv[i], op[j].label) == 0) break;
     }
     *cp = '=';
-    if (op[j].label == 0) {
+    if (op[j].label == nullptr) {
         if (err) {
             fprintf(err, "%sundefined option.\n", emsg);
             errline(i, 0, err);
@@ -2174,7 +2174,7 @@ int OptNArgs(void) {
     int cnt = 0;
     int dashdash = 0;
     int i;
-    if (g_argv != 0 && g_argv[0] != 0) {
+    if (g_argv != nullptr && g_argv[0] != nullptr) {
         for (i = 1; g_argv[i]; i++) {
             if (dashdash || !ISOPT(g_argv[i])) cnt++;
             if (strcmp(g_argv[i], "--") == 0) dashdash = 1;
@@ -2187,7 +2187,7 @@ char* OptArg(int n)
 {
     int i;
     i = argindex(n);
-    return i >= 0 ? g_argv[i] : 0;
+    return i >= 0 ? g_argv[i] : nullptr;
 }
 
 void OptErr(int n)
@@ -2313,9 +2313,9 @@ static void parseonetoken(struct pstate* psp)
 #endif
     switch (psp->state) {
     case INITIALIZE:
-        psp->prevrule = 0;
+        psp->prevrule = nullptr;
         psp->preccounter = 0;
-        psp->firstrule = psp->lastrule = 0;
+        psp->firstrule = psp->lastrule = nullptr;
         psp->gp->nrule = 0;
         /* fall through */
     case WAITING_FOR_DECL_OR_RULE:
@@ -2325,17 +2325,17 @@ static void parseonetoken(struct pstate* psp)
         else if (ISLOWER(x[0])) {
             psp->lhs = Symbol_new(x);
             psp->nrhs = 0;
-            psp->lhsalias = 0;
+            psp->lhsalias = nullptr;
             psp->state = WAITING_FOR_ARROW;
         }
         else if (x[0] == '{') {
-            if (psp->prevrule == 0) {
+            if (psp->prevrule == nullptr) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
                     "There is no prior rule upon which to attach the code "
                     "fragment which begins on this line.");
                 psp->errorcnt++;
             }
-            else if (psp->prevrule->code != 0) {
+            else if (psp->prevrule->code != nullptr) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
                     "Code fragment beginning on this line is not the first "
                     "to follow the previous rule.");
@@ -2366,12 +2366,12 @@ static void parseonetoken(struct pstate* psp)
                 "The precedence symbol must be a terminal.");
             psp->errorcnt++;
         }
-        else if (psp->prevrule == 0) {
+        else if (psp->prevrule == nullptr) {
             ErrorMsg(psp->filename, psp->tokenlineno,
                 "There is no prior rule to assign precedence \"[%s]\".", x);
             psp->errorcnt++;
         }
-        else if (psp->prevrule->precsym != 0) {
+        else if (psp->prevrule->precsym != nullptr) {
             ErrorMsg(psp->filename, psp->tokenlineno,
                 "Precedence mark on this line is not the first "
                 "to follow the previous rule.");
@@ -2446,11 +2446,11 @@ static void parseonetoken(struct pstate* psp)
             struct rule* rp;
             rp = (struct rule*)calloc(sizeof(struct rule) +
                 sizeof(struct symbol*) * psp->nrhs + sizeof(char*) * psp->nrhs, 1);
-            if (rp == 0) {
+            if (rp == nullptr) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
                     "Can't allocate enough memory for this rule.");
                 psp->errorcnt++;
-                psp->prevrule = 0;
+                psp->prevrule = nullptr;
             }
             else {
                 int i;
@@ -2460,19 +2460,19 @@ static void parseonetoken(struct pstate* psp)
                 for (i = 0; i < psp->nrhs; i++) {
                     rp->rhs[i] = psp->rhs[i];
                     rp->rhsalias[i] = psp->alias[i];
-                    if (rp->rhsalias[i] != 0) { rp->rhs[i]->bContent = 1; }
+                    if (rp->rhsalias[i] != nullptr) { rp->rhs[i]->bContent = 1; }
                 }
                 rp->lhs = psp->lhs;
                 rp->lhsalias = psp->lhsalias;
                 rp->nrhs = psp->nrhs;
-                rp->code = 0;
+                rp->code = nullptr;
                 rp->noCode = Boolean::LEMON_TRUE;
-                rp->precsym = 0;
+                rp->precsym = nullptr;
                 rp->index = psp->gp->nrule++;
                 rp->nextlhs = rp->lhs->rule;
                 rp->lhs->rule = rp;
-                rp->next = 0;
-                if (psp->firstrule == 0) {
+                rp->next = nullptr;
+                if (psp->firstrule == nullptr) {
                     psp->firstrule = psp->lastrule = rp;
                 }
                 else {
@@ -2557,8 +2557,8 @@ static void parseonetoken(struct pstate* psp)
     case WAITING_FOR_DECL_KEYWORD:
         if (ISALPHA(x[0])) {
             psp->declkeyword = x;
-            psp->declargslot = 0;
-            psp->decllinenoslot = 0;
+            psp->declargslot = nullptr;
+            psp->decllinenoslot = nullptr;
             psp->insertLineMacro = 1;
             psp->state = WAITING_FOR_DECL_ARG;
             if (strcmp(x, "name") == 0) {
@@ -2749,7 +2749,7 @@ static void parseonetoken(struct pstate* psp)
             addLineMacro = !psp->gp->nolinenosflag
                 && psp->insertLineMacro
                 && psp->tokenlineno > 1
-                && (psp->decllinenoslot == 0 || psp->decllinenoslot[0] != 0);
+                && (psp->decllinenoslot == nullptr || psp->decllinenoslot[0] != 0);
             if (addLineMacro) {
                 for (z = psp->filename, nBack = 0; *z; z++) {
                     if (*z == '\\') nBack++;
@@ -2802,7 +2802,7 @@ static void parseonetoken(struct pstate* psp)
         }
         else {
             struct symbol* sp = Symbol_new(x);
-            if (psp->fallback == 0) {
+            if (psp->fallback == nullptr) {
                 psp->fallback = sp;
             }
             else if (sp->fallback) {
@@ -2849,7 +2849,7 @@ static void parseonetoken(struct pstate* psp)
         }
         else {
             struct symbol* sp = Symbol_new(x);
-            if (psp->gp->wildcard == 0) {
+            if (psp->gp->wildcard == nullptr) {
                 psp->gp->wildcard = sp;
             }
             else {
@@ -3096,7 +3096,7 @@ void Parse(struct lemon* gp)
 
     /* Begin by reading the input file */
     fp = fopen(ps.filename, "rb");
-    if (fp == 0) {
+    if (fp == nullptr) {
         ErrorMsg(ps.filename, 0, "Can't open this file for reading.");
         gp->errorcnt++;
         return;
@@ -3105,7 +3105,7 @@ void Parse(struct lemon* gp)
     filesize = ftell(fp);
     rewind(fp);
     filebuf = (char*)malloc(filesize + 1);
-    if (filesize > 100000000 || filebuf == 0) {
+    if (filesize > 100000000 || filebuf == nullptr) {
         ErrorMsg(ps.filename, 0, "Input file too large.");
         free(filebuf);
         gp->errorcnt++;
@@ -3244,23 +3244,23 @@ void Parse(struct lemon* gp)
 ** Routines processing configuration follow-set propagation links
 ** in the LEMON parser generator.
 */
-static struct plink* plink_freelist = 0;
+static struct plink* plink_freelist = nullptr;
 
 /* Allocate a new plink */
 struct plink* Plink_new(void) {
     struct plink* newlink;
 
-    if (plink_freelist == 0) {
+    if (plink_freelist == nullptr) {
         int i;
         int amt = 100;
         plink_freelist = (struct plink*)calloc(amt, sizeof(struct plink));
-        if (plink_freelist == 0) {
+        if (plink_freelist == nullptr) {
             fprintf(stderr,
                 "Unable to allocate memory for a new follow-set propagation link.\n");
             exit(1);
         }
         for (i = 0; i < amt - 1; i++) plink_freelist[i].next = &plink_freelist[i + 1];
-        plink_freelist[amt - 1].next = 0;
+        plink_freelist[amt - 1].next = nullptr;
     }
     newlink = plink_freelist;
     plink_freelist = plink_freelist->next;
@@ -3326,7 +3326,7 @@ PRIVATE char* file_makename(struct lemon* lemp, const char* suffix)
     if (outputDir) sz += lemonStrlen(outputDir) + 1;
     sz += 5;
     name = (char*)malloc(sz);
-    if (name == 0) {
+    if (name == nullptr) {
         fprintf(stderr, "Can't allocate space for a filename.\n");
         exit(1);
     }
@@ -3355,10 +3355,10 @@ PRIVATE FILE* file_open(
     if (lemp->outname) free(lemp->outname);
     lemp->outname = file_makename(lemp, suffix);
     fp = fopen(lemp->outname, mode);
-    if (fp == 0 && *mode == 'w') {
+    if (fp == nullptr && *mode == 'w') {
         fprintf(stderr, "Can't open file \"%s\".\n", lemp->outname);
         lemp->errorcnt++;
-        return 0;
+        return nullptr;
     }
     return fp;
 }
@@ -3565,7 +3565,7 @@ void ReportOutput(struct lemon* lemp)
     FILE* fp;
 
     fp = file_open(lemp, ".out", "wb");
-    if (fp == 0) return;
+    if (fp == nullptr) return;
     for (i = 0; i < lemp->nxstate; i++) {
         stp = lemp->sorted[i];
         fprintf(fp, "State %d:\n", stp->statenum);
@@ -3660,8 +3660,8 @@ void ReportOutput(struct lemon* lemp)
 PRIVATE char* pathsearch(char* argv0, char* name, int modemask)
 {
     const char* pathlist;
-    char* pathbufptr = 0;
-    char* pathbuf = 0;
+    char* pathbufptr = nullptr;
+    char* pathbuf = nullptr;
     char* path, * cp;
     char c;
 
@@ -3679,15 +3679,15 @@ PRIVATE char* pathsearch(char* argv0, char* name, int modemask)
     }
     else {
         pathlist = getenv("PATH");
-        if (pathlist == 0) pathlist = ".:/bin:/usr/bin";
+        if (pathlist == nullptr) pathlist = ".:/bin:/usr/bin";
         pathbuf = (char*)malloc(lemonStrlen(pathlist) + 1);
         path = (char*)malloc(lemonStrlen(pathlist) + lemonStrlen(name) + 2);
-        if ((pathbuf != 0) && (path != 0)) {
+        if ((pathbuf != nullptr) && (path != 0)) {
             pathbufptr = pathbuf;
             lemon_strcpy(pathbuf, pathlist);
             while (*pathbuf) {
                 cp = strchr(pathbuf, ':');
-                if (cp == 0) cp = &pathbuf[lemonStrlen(pathbuf)];
+                if (cp == nullptr) cp = &pathbuf[lemonStrlen(pathbuf)];
                 c = *cp;
                 *cp = 0;
                 lemon_sprintf(path, "%s/%s", pathbuf, name);
@@ -3782,23 +3782,23 @@ PRIVATE FILE* tplt_open(struct lemon* lemp)
     char buf[1000];
     FILE* in;
     char* tpltname;
-    char* toFree = 0;
+    char* toFree = nullptr;
     char* cp;
 
     /* first, see if user specified a template filename on the command line. */
-    if (user_templatename != 0) {
+    if (user_templatename != nullptr) {
         if (access(user_templatename, 004) == -1) {
             fprintf(stderr, "Can't find the parser driver template file \"%s\".\n",
                 user_templatename);
             lemp->errorcnt++;
-            return 0;
+            return nullptr;
         }
         in = fopen(user_templatename, "rb");
-        if (in == 0) {
+        if (in == nullptr) {
             fprintf(stderr, "Can't open the template file \"%s\".\n",
                 user_templatename);
             lemp->errorcnt++;
-            return 0;
+            return nullptr;
         }
         return in;
     }
@@ -3819,14 +3819,14 @@ PRIVATE FILE* tplt_open(struct lemon* lemp)
     else {
         toFree = tpltname = pathsearch(lemp->argv0, templatename, 0);
     }
-    if (tpltname == 0) {
+    if (tpltname == nullptr) {
         fprintf(stderr, "Can't find the parser driver template file \"%s\".\n",
             templatename);
         lemp->errorcnt++;
-        return 0;
+        return nullptr;
     }
     in = fopen(tpltname, "rb");
-    if (in == 0) {
+    if (in == nullptr) {
         fprintf(stderr, "Can't open the template file \"%s\".\n", tpltname);
         lemp->errorcnt++;
     }
@@ -3849,7 +3849,7 @@ PRIVATE void tplt_linedir(FILE* out, int lineno, char* filename)
 /* Print a string to the file and keep the linenumber up to date */
 PRIVATE void tplt_print(FILE* out, struct lemon* lemp, char* str, int* lineno)
 {
-    if (str == 0) return;
+    if (str == nullptr) return;
     while (*str) {
         putc(*str, out);
         if (*str == '\n') (*lineno)++;
@@ -3875,11 +3875,11 @@ void emit_destructor_code(
     struct lemon* lemp,
     int* lineno
 ) {
-    char* cp = 0;
+    char* cp = nullptr;
 
     if (sp->type == TERMINAL) {
         cp = lemp->tokendest;
-        if (cp == 0) return;
+        if (cp == nullptr) return;
         fprintf(out, "{\n"); (*lineno)++;
     }
     else if (sp->destructor) {
@@ -3892,7 +3892,7 @@ void emit_destructor_code(
     }
     else if (lemp->vardest) {
         cp = lemp->vardest;
-        if (cp == 0) return;
+        if (cp == nullptr) return;
         fprintf(out, "{\n"); (*lineno)++;
     }
     else {
@@ -3922,16 +3922,16 @@ int has_destructor(struct symbol* sp, struct lemon* lemp)
 {
     int ret;
     if (sp->type == TERMINAL) {
-        ret = lemp->tokendest != 0;
+        ret = lemp->tokendest != nullptr;
     }
     else {
-        ret = lemp->vardest != 0 || sp->destructor != 0;
+        ret = lemp->vardest != nullptr || sp->destructor != nullptr;
     }
     return ret;
 }
 
 /*
-** Append text to a dynamically allocated string.  If zText is 0 then
+** Append text to a dynamically allocated string.  If zText is nullptr then
 ** reset the string to be empty again.  Always return the complete text
 ** of the string (which is overwritten with each call).
 **
@@ -3944,13 +3944,13 @@ int has_destructor(struct symbol* sp, struct lemon* lemp)
 */
 PRIVATE char* append_str(const char* zText, int n, int p1, int p2) {
     static char empty[1] = { 0 };
-    static char* z = 0;
+    static char* z = nullptr;
     static int alloced = 0;
     static int used = 0;
     int c;
     char zInt[40];
-    if (zText == 0) {
-        if (used == 0 && z != 0) z[0] = 0;
+    if (zText == nullptr) {
+        if (used == 0 && z != nullptr) z[0] = 0;
         used = 0;
         return z;
     }
@@ -3965,7 +3965,7 @@ PRIVATE char* append_str(const char* zText, int n, int p1, int p2) {
         alloced = n + sizeof(zInt) * 2 + used + 200;
         z = (char*)realloc(z, alloced);
     }
-    if (z == 0) return empty;
+    if (z == nullptr) return empty;
     while (n-- > 0) {
         c = *(zText++);
         if (c == '%' && n > 0 && zText[0] == 'd') {
@@ -3996,7 +3996,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
     int i;
     int rc = 0;            /* True if yylhsminor is used */
     int dontUseRhs0 = 0;   /* If true, use of left-most RHS label is illegal */
-    const char* zSkip = 0; /* The zOvwrt comment within rp->code, or NULL */
+    const char* zSkip = nullptr; /* The zOvwrt comment within rp->code, or NULL */
     char lhsused = 0;      /* True if the LHS element has been used */
     char lhsdirect;        /* True if LHS writes directly into stack */
     char used[MAXRHS];     /* True for each RHS element which is used */
@@ -4006,7 +4006,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
     for (i = 0; i < rp->nrhs; i++) used[i] = 0;
     lhsused = 0;
 
-    if (rp->code == 0) {
+    if (rp->code == nullptr) {
         static char newlinestr[2] = { '\n', '\0' };
         rp->code = newlinestr;
         rp->line = rp->ruleline;
@@ -4021,19 +4021,19 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
         /* If there are no RHS symbols, then writing directly to the LHS is ok */
         lhsdirect = 1;
     }
-    else if (rp->rhsalias[0] == 0) {
+    else if (rp->rhsalias[0] == nullptr) {
         /* The left-most RHS symbol has no value.  LHS direct is ok.  But
         ** we have to call the destructor on the RHS symbol first. */
         lhsdirect = 1;
         if (has_destructor(rp->rhs[0], lemp)) {
-            append_str(0, 0, 0, 0);
+            append_str(nullptr, 0, 0, 0);
             append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
                 rp->rhs[0]->index, 1 - rp->nrhs);
-            rp->codePrefix = Strsafe(append_str(0, 0, 0, 0));
+            rp->codePrefix = Strsafe(append_str(nullptr, 0, 0, 0));
             rp->noCode = Boolean::LEMON_FALSE;
         }
     }
-    else if (rp->lhsalias == 0) {
+    else if (rp->lhsalias == nullptr) {
         /* There is no LHS value symbol. */
         lhsdirect = 1;
     }
@@ -4055,7 +4055,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
         lemon_sprintf(zOvwrt, "/*%s-overwrites-%s*/",
             rp->lhsalias, rp->rhsalias[0]);
         zSkip = strstr(rp->code, zOvwrt);
-        if (zSkip != 0) {
+        if (zSkip != nullptr) {
             /* The code contains a special comment that indicates that it is safe
             ** for the LHS label to overwrite left-most RHS label. */
             lhsdirect = 1;
@@ -4072,7 +4072,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
         sprintf(zLhs, "yylhsminor.yy%d", rp->lhs->dtnum);
     }
 
-    append_str(0, 0, 0, 0);
+    append_str(nullptr, 0, 0, 0);
 
     /* This const cast is wrong but harmless, if we're careful. */
     for (cp = (char*)rp->code; *cp; cp++) {
@@ -4129,9 +4129,9 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
     } /* End loop */
 
     /* Main code generation completed */
-    cp = append_str(0, 0, 0, 0);
+    cp = append_str(nullptr, 0, 0, 0);
     if (cp && cp[0]) rp->code = Strsafe(cp);
-    append_str(0, 0, 0, 0);
+    append_str(nullptr, 0, 0, 0);
 
     /* Check to make sure the LHS has been used */
     if (rp->lhsalias && !lhsused) {
@@ -4187,7 +4187,7 @@ PRIVATE int translate_code(struct lemon* lemp, struct rule* rp) {
     }
 
     /* Suffix code generation complete */
-    cp = append_str(0, 0, 0, 0);
+    cp = append_str(nullptr, 0, 0, 0);
     if (cp && cp[0]) {
         rp->codeSuffix = Strsafe(cp);
         rp->noCode = Boolean::LEMON_FALSE;
@@ -4267,7 +4267,7 @@ void print_stack_union(
     /* Allocate and initialize types[] and allocate stddt[] */
     arraysize = lemp->nsymbol * 2;
     types = (char**)calloc(arraysize, sizeof(char*));
-    if (types == 0) {
+    if (types == nullptr) {
         fprintf(stderr, "Out of memory.\n");
         exit(1);
     }
@@ -4279,12 +4279,12 @@ void print_stack_union(
     for (i = 0; i < lemp->nsymbol; i++) {
         int len;
         struct symbol* sp = lemp->symbols[i];
-        if (sp->datatype == 0) continue;
+        if (sp->datatype == nullptr) continue;
         len = lemonStrlen(sp->datatype);
         if (len > maxdtlength) maxdtlength = len;
     }
     stddt = (char*)malloc(maxdtlength * 2 + 1);
-    if (stddt == 0) {
+    if (stddt == nullptr) {
         fprintf(stderr, "Out of memory.\n");
         exit(1);
     }
@@ -4302,12 +4302,12 @@ void print_stack_union(
             sp->dtnum = arraysize + 1;
             continue;
         }
-        if (sp->type != NONTERMINAL || (sp->datatype == 0 && lemp->vartype == 0)) {
+        if (sp->type != NONTERMINAL || (sp->datatype == nullptr && lemp->vartype == nullptr)) {
             sp->dtnum = 0;
             continue;
         }
         cp = sp->datatype;
-        if (cp == 0) cp = lemp->vartype;
+        if (cp == nullptr) cp = lemp->vartype;
         j = 0;
         while (ISSPACE(*cp)) cp++;
         while (*cp) stddt[j++] = *cp++;
@@ -4330,10 +4330,10 @@ void print_stack_union(
             hash++;
             if (hash >= (unsigned)arraysize) hash = 0;
         }
-        if (types[hash] == 0) {
+        if (types[hash] == nullptr) {
             sp->dtnum = hash + 1;
             types[hash] = (char*)malloc(lemonStrlen(stddt) + 1);
-            if (types[hash] == 0) {
+            if (types[hash] == nullptr) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(1);
             }
@@ -4352,7 +4352,7 @@ void print_stack_union(
     fprintf(out, "  int yyinit;\n"); lineno++;
     fprintf(out, "  %sTOKENTYPE yy0;\n", name); lineno++;
     for (i = 0; i < arraysize; i++) {
-        if (types[i] == 0) continue;
+        if (types[i] == nullptr) continue;
         fprintf(out, "  %s yy%d;\n", types[i], i + 1); lineno++;
         free(types[i]);
     }
@@ -4481,18 +4481,18 @@ void ReportTable(
     lemp->maxAction = lemp->minReduce + lemp->nrule;
 
     in = tplt_open(lemp);
-    if (in == 0) return;
+    if (in == nullptr) return;
     out = file_open(lemp, ".c", "wb");
-    if (out == 0) {
+    if (out == nullptr) {
         fclose(in);
         return;
     }
     if (sqlFlag == 0) {
-        sql = 0;
+        sql = nullptr;
     }
     else {
         sql = file_open(lemp, ".sql", "wb");
-        if (sql == 0) {
+        if (sql == nullptr) {
             fclose(in);
             fclose(out);
             return;
@@ -4571,7 +4571,7 @@ void ReportTable(
     /* The first %include directive begins with a C-language comment,
     ** then skip over the header comment of the template file
     */
-    if (lemp->include == 0) lemp->include = INCLUDE_BUFFER;
+    if (lemp->include == nullptr) lemp->include = INCLUDE_BUFFER;
     for (i = 0; ISSPACE(lemp->include[i]); i++) {
         if (lemp->include[i] == '\n') {
             lemp->include += i + 1;
@@ -4687,7 +4687,7 @@ void ReportTable(
     ** we need to know how many states can be eliminated.
     */
     ax = (struct axset*)calloc(lemp->nxstate * 2, sizeof(ax[0]));
-    if (ax == 0) {
+    if (ax == nullptr) {
         fprintf(stderr, "malloc failed\n");
         exit(1);
     }
@@ -4934,7 +4934,7 @@ void ReportTable(
         lemp->tablesize += (mx + 1) * szCodeType;
         for (i = 0; i <= mx; i++) {
             struct symbol* p = lemp->symbols[i];
-            if (p->fallback == 0) {
+            if (p->fallback == nullptr) {
                 fprintf(out, "    0,  /* %10s => nothing */\n", p->name);
             }
             else {
@@ -4974,7 +4974,7 @@ void ReportTable(
         int once = 1;
         for (i = 0; i < lemp->nsymbol; i++) {
             struct symbol* sp = lemp->symbols[i];
-            if (sp == 0 || sp->type != TERMINAL) continue;
+            if (sp == nullptr || sp->type != TERMINAL) continue;
             if (once) {
                 fprintf(out, "      /* TERMINAL Destructor */\n"); lineno++;
                 once = 0;
@@ -4988,12 +4988,12 @@ void ReportTable(
         }
     }
     if (lemp->vardest) {
-        struct symbol* dflt_sp = 0;
+        struct symbol* dflt_sp = nullptr;
         int once = 1;
         for (i = 0; i < lemp->nsymbol; i++) {
             struct symbol* sp = lemp->symbols[i];
-            if (sp == 0 || sp->type == TERMINAL ||
-                sp->index <= 0 || sp->destructor != 0) continue;
+            if (sp == nullptr || sp->type == TERMINAL ||
+                sp->index <= 0 || sp->destructor != nullptr) continue;
             if (once) {
                 fprintf(out, "      /* Default NON-TERMINAL Destructor */\n"); lineno++;
                 once = 0;
@@ -5001,14 +5001,14 @@ void ReportTable(
             fprintf(out, "    case %d: /* %s */\n", sp->index, sp->name); lineno++;
             dflt_sp = sp;
         }
-        if (dflt_sp != 0) {
+        if (dflt_sp != nullptr) {
             emit_destructor_code(out, dflt_sp, lemp, &lineno);
         }
         fprintf(out, "      break;\n"); lineno++;
     }
     for (i = 0; i < lemp->nsymbol; i++) {
         struct symbol* sp = lemp->symbols[i];
-        if (sp == 0 || sp->type == TERMINAL || sp->destructor == 0) continue;
+        if (sp == nullptr || sp->type == TERMINAL || sp->destructor == nullptr) continue;
         if (sp->destLineno < 0) continue;  /* Already emitted */
         fprintf(out, "    case %d: /* %s */\n", sp->index, sp->name); lineno++;
 
@@ -5184,7 +5184,7 @@ void CompressTables(struct lemon* lemp)
     for (i = 0; i < lemp->nstate; i++) {
         stp = lemp->sorted[i];
         nbest = 0;
-        rbest = 0;
+        rbest = nullptr;
         usesWildcard = 0;
 
         for (ap = stp->ap; ap; ap = ap->next) {
@@ -5230,7 +5230,7 @@ void CompressTables(struct lemon* lemp)
             if (ap->type == SHIFT) break;
             if (ap->type == REDUCE && ap->x.rp != rbest) break;
         }
-        if (ap == 0) {
+        if (ap == nullptr) {
             stp->autoReduce = 1;
             stp->pDfltReduce = rbest;
         }
@@ -5246,7 +5246,7 @@ void CompressTables(struct lemon* lemp)
             struct state* pNextState;
             if (ap->type != SHIFT) continue;
             pNextState = ap->x.stp;
-            if (pNextState->autoReduce && pNextState->pDfltReduce != 0) {
+            if (pNextState->autoReduce && pNextState->pDfltReduce != nullptr) {
                 ap->type = SHIFTREDUCE;
                 ap->x.rp = pNextState->pDfltReduce;
             }
@@ -5369,7 +5369,7 @@ void SetSize(int n)
 char* SetNew(void) {
     char* s;
     s = (char*)calloc(size, 1);
-    if (s == 0) {
+    if (s == nullptr) {
         memory_error();
     }
     return s;
@@ -5435,9 +5435,9 @@ const char* Strsafe(const char* y)
     const char* z;
     char* cpy;
 
-    if (y == 0) return 0;
+    if (y == nullptr) return 0;
     z = Strsafe_find(y);
-    if (z == 0 && (cpy = (char*)malloc(lemonStrlen(y) + 1)) != 0) {
+    if (z == nullptr && (cpy = (char*)malloc(lemonStrlen(y) + 1)) != 0) {
         lemon_strcpy(cpy, y);
         z = cpy;
         Strsafe_insert(z);
@@ -5478,9 +5478,9 @@ void Strsafe_init(void) {
         x1a->size = 1024;
         x1a->count = 0;
         x1a->tbl = (x1node*)calloc(1024, sizeof(x1node) + sizeof(x1node*));
-        if (x1a->tbl == 0) {
+        if (x1a->tbl == nullptr) {
             free(x1a);
-            x1a = 0;
+            x1a = nullptr;
         }
         else {
             int i;
@@ -5497,7 +5497,7 @@ int Strsafe_insert(const char* data)
     unsigned h;
     unsigned ph;
 
-    if (x1a == 0) return 0;
+    if (x1a == nullptr) return 0;
     ph = strhash(data);
     h = ph & (x1a->size - 1);
     np = x1a->ht[h];
@@ -5516,9 +5516,9 @@ int Strsafe_insert(const char* data)
         array.size = arrSize = x1a->size * 2;
         array.count = x1a->count;
         array.tbl = (x1node*)calloc(arrSize, sizeof(x1node) + sizeof(x1node*));
-        if (array.tbl == 0) return 0;  /* Fail due to malloc failure */
+        if (array.tbl == nullptr) return 0;  /* Fail due to malloc failure */
         array.ht = (x1node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = 0;
+        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
         for (i = 0; i < x1a->count; i++) {
             x1node* oldnp, * newnp;
             oldnp = &(x1a->tbl[i]);
@@ -5551,14 +5551,14 @@ const char* Strsafe_find(const char* key)
     unsigned h;
     x1node* np;
 
-    if (x1a == 0) return 0;
+    if (x1a == nullptr) return 0;
     h = strhash(key) & (x1a->size - 1);
     np = x1a->ht[h];
     while (np) {
         if (strcmp(np->data, key) == 0) break;
         np = np->next;
     }
-    return np ? np->data : 0;
+    return np ? np->data : nullptr;
 }
 
 /* Return a pointer to the (terminal or nonterminal) symbol "x".
@@ -5569,20 +5569,20 @@ struct symbol* Symbol_new(const char* x)
     struct symbol* sp;
 
     sp = Symbol_find(x);
-    if (sp == 0) {
+    if (sp == nullptr) {
         sp = (struct symbol*)calloc(1, sizeof(struct symbol));
         MemoryCheck(sp);
         sp->name = Strsafe(x);
         sp->type = ISUPPER(*x) ? TERMINAL : NONTERMINAL;
-        sp->rule = 0;
-        sp->fallback = 0;
+        sp->rule = nullptr;
+        sp->fallback = nullptr;
         sp->prec = -1;
         sp->assoc = UNK;
-        sp->firstset = 0;
+        sp->firstset = nullptr;
         sp->lambda = LEMON_FALSE;
-        sp->destructor = 0;
+        sp->destructor = nullptr;
         sp->destLineno = 0;
-        sp->datatype = 0;
+        sp->datatype = nullptr;
         sp->useCnt = 0;
         Symbol_insert(sp, sp->name);
     }
@@ -5646,9 +5646,9 @@ void Symbol_init(void) {
         x2a->size = 128;
         x2a->count = 0;
         x2a->tbl = (x2node*)calloc(128, sizeof(x2node) + sizeof(x2node*));
-        if (x2a->tbl == 0) {
+        if (x2a->tbl == nullptr) {
             free(x2a);
-            x2a = 0;
+            x2a = nullptr;
         }
         else {
             int i;
@@ -5665,7 +5665,7 @@ int Symbol_insert(struct symbol* data, const char* key)
     unsigned h;
     unsigned ph;
 
-    if (x2a == 0) return 0;
+    if (x2a == nullptr) return 0;
     ph = strhash(key);
     h = ph & (x2a->size - 1);
     np = x2a->ht[h];
@@ -5684,9 +5684,9 @@ int Symbol_insert(struct symbol* data, const char* key)
         array.size = arrSize = x2a->size * 2;
         array.count = x2a->count;
         array.tbl = (x2node*)calloc(arrSize, sizeof(x2node) + sizeof(x2node*));
-        if (array.tbl == 0) return 0;  /* Fail due to malloc failure */
+        if (array.tbl == nullptr) return 0;  /* Fail due to malloc failure */
         array.ht = (x2node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = 0;
+        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
         for (i = 0; i < x2a->count; i++) {
             x2node* oldnp, * newnp;
             oldnp = &(x2a->tbl[i]);
@@ -5721,14 +5721,14 @@ struct symbol* Symbol_find(const char* key)
     unsigned h;
     x2node* np;
 
-    if (x2a == 0) return 0;
+    if (x2a == nullptr) return 0;
     h = strhash(key) & (x2a->size - 1);
     np = x2a->ht[h];
     while (np) {
         if (strcmp(np->key, key) == 0) break;
         np = np->next;
     }
-    return np ? np->data : 0;
+    return np ? np->data : nullptr;
 }
 
 /* Return the n-th data.  Return NULL if n is out of range. */
@@ -5739,7 +5739,7 @@ struct symbol* Symbol_Nth(int n)
         data = x2a->tbl[n - 1].data;
     }
     else {
-        data = 0;
+        data = nullptr;
     }
     return data;
 }
@@ -5757,7 +5757,7 @@ struct symbol** Symbol_arrayof()
 {
     struct symbol** array;
     int i, arrSize;
-    if (x2a == 0) return 0;
+    if (x2a == nullptr) return 0;
     arrSize = x2a->count;
     array = (struct symbol**)calloc(arrSize, sizeof(struct symbol*));
     if (array) {
@@ -5845,14 +5845,14 @@ void State_init(void) {
         x3a->size = 128;
         x3a->count = 0;
         x3a->tbl = (x3node*)calloc(128, sizeof(x3node) + sizeof(x3node*));
-        if (x3a->tbl == 0) {
+        if (x3a->tbl == nullptr) {
             free(x3a);
-            x3a = 0;
+            x3a = nullptr;
         }
         else {
             int i;
             x3a->ht = (x3node**)&(x3a->tbl[128]);
-            for (i = 0; i < 128; i++) x3a->ht[i] = 0;
+            for (i = 0; i < 128; i++) x3a->ht[i] = nullptr;
         }
     }
 }
@@ -5864,7 +5864,7 @@ int State_insert(struct state* data, struct config* key)
     unsigned h;
     unsigned ph;
 
-    if (x3a == 0) return 0;
+    if (x3a == nullptr) return 0;
     ph = statehash(key);
     h = ph & (x3a->size - 1);
     np = x3a->ht[h];
@@ -5885,7 +5885,7 @@ int State_insert(struct state* data, struct config* key)
         array.tbl = (x3node*)calloc(arrSize, sizeof(x3node) + sizeof(x3node*));
         if (array.tbl == 0) return 0;  /* Fail due to malloc failure */
         array.ht = (x3node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = 0;
+        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
         for (i = 0; i < x3a->count; i++) {
             x3node* oldnp, * newnp;
             oldnp = &(x3a->tbl[i]);
@@ -5920,14 +5920,14 @@ struct state* State_find(struct config* key)
     unsigned h;
     x3node* np;
 
-    if (x3a == 0) return 0;
+    if (x3a == nullptr) return nullptr;
     h = statehash(key) & (x3a->size - 1);
     np = x3a->ht[h];
     while (np) {
         if (statecmp(np->key, key) == 0) break;
         np = np->next;
     }
-    return np ? np->data : 0;
+    return np ? np->data : nullptr;
 }
 
 /* Return an array of pointers to all data in the table.
@@ -5937,7 +5937,7 @@ struct state** State_arrayof(void)
 {
     struct state** array;
     int i, arrSize;
-    if (x3a == 0) return 0;
+    if (x3a == nullptr) return 0;
     arrSize = x3a->count;
     array = (struct state**)calloc(arrSize, sizeof(struct state*));
     if (array) {
@@ -5993,7 +5993,7 @@ void Configtable_init(void) {
         else {
             int i;
             x4a->ht = (x4node**)&(x4a->tbl[64]);
-            for (i = 0; i < 64; i++) x4a->ht[i] = 0;
+            for (i = 0; i < 64; i++) x4a->ht[i] = nullptr;
         }
     }
 }
@@ -6005,7 +6005,7 @@ int Configtable_insert(struct config* data)
     unsigned h;
     unsigned ph;
 
-    if (x4a == 0) return 0;
+    if (x4a == nullptr) return 0;
     ph = confighash(data);
     h = ph & (x4a->size - 1);
     np = x4a->ht[h];
@@ -6024,9 +6024,9 @@ int Configtable_insert(struct config* data)
         array.size = arrSize = x4a->size * 2;
         array.count = x4a->count;
         array.tbl = (x4node*)calloc(arrSize, sizeof(x4node) + sizeof(x4node*));
-        if (array.tbl == 0) return 0;  /* Fail due to malloc failure */
+        if (array.tbl == nullptr) return 0;  /* Fail due to malloc failure */
         array.ht = (x4node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = 0;
+        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
         for (i = 0; i < x4a->count; i++) {
             x4node* oldnp, * newnp;
             oldnp = &(x4a->tbl[i]);
@@ -6059,14 +6059,14 @@ struct config* Configtable_find(struct config* key)
     int h;
     x4node* np;
 
-    if (x4a == 0) return 0;
+    if (x4a == nullptr) return nullptr;
     h = confighash(key) & (x4a->size - 1);
     np = x4a->ht[h];
     while (np) {
         if (Configcmp((const char*)np->data, (const char*)key) == 0) break;
         np = np->next;
     }
-    return np ? np->data : 0;
+    return np ? np->data : nullptr;
 }
 
 /* Remove all data from the table.  Pass each data to the function "f"
@@ -6074,9 +6074,9 @@ struct config* Configtable_find(struct config* key)
 void Configtable_clear(int(*f)(struct config*))
 {
     int i;
-    if (x4a == 0 || x4a->count == 0) return;
+    if (x4a == nullptr || x4a->count == 0) return;
     if (f) for (i = 0; i < x4a->count; i++) (*f)(x4a->tbl[i].data);
-    for (i = 0; i < x4a->size; i++) x4a->ht[i] = 0;
+    for (i = 0; i < x4a->size; i++) x4a->ht[i] = nullptr;
     x4a->count = 0;
     return;
 }
