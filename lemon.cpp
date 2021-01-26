@@ -8,6 +8,8 @@
 ** The author of this program disclaims copyright.
 */
 
+#include "lemon.h"
+
 //Allows the use of fopen/getenv/sprintf
 #define _CRT_SECURE_NO_DEPRECATE
 #include <stdio.h>
@@ -173,24 +175,6 @@ static void lemon_strcat(char* dest, const char* src) {
     lemon_strcpy(dest, src);
 }
 
-
-/* a few forward declarations... */
-namespace Rule
-{
-struct rule;
-}
-using namespace Rule;
-
-struct lemon;
-
-namespace Action
-{
-struct action;
-
-static action* Action_new(void);
-static action* Action_sort(action*);
-}
-using namespace Action;
 /********** From the file "build.h" ************************************/
 void FindRulePrecedences(lemon&);
 void FindFirstSets(lemon&);
@@ -199,26 +183,7 @@ void FindLinks(lemon&);
 void FindFollowSets(lemon&);
 void FindActions(lemon&);
 
-namespace Config
-{
-struct config;
-}
-using namespace Config;
-/********* From the file "configlist.h" *********************************/
-namespace Configlist
-{
-void Configlist_init(void);
-config* Configlist_add(Rule::rule*, int);
-config* Configlist_addbasis(Rule::rule*, int);
-void Configlist_closure(lemon&);
-void Configlist_sort(void);
-void Configlist_sortbasis(void);
-config* Configlist_return(void);
-config* Configlist_basis(void);
-void Configlist_eat(config*);
-void Configlist_reset(void);
-}
-using namespace Configlist;
+
 /********* From the file "error.h" ***************************************/
 void ErrorMsg(const char*, int, const char*, ...);
 
@@ -243,16 +208,7 @@ void   OptPrint(void);
 void Parse(lemon& lemp);
 
 /********* From the file "plink.h" ***************************************/
-namespace Plink
-{
-struct plink;
 
-plink* Plink_new();
-void Plink_add(plink**, config*);
-void Plink_copy(plink**, plink*);
-void Plink_delete(plink*);
-}
-using namespace Plink;
 /********** From the file "report.h" *************************************/
 void Reprint(lemon&);
 void ReportOutput(lemon&);
@@ -274,241 +230,8 @@ int SetUnion(char*, const char*);    /* A <- A U B, thru element N */
 ** Principal data structures for the LEMON parser generator.
 */
 
-enum class Boolean
-{ 
-    LEMON_FALSE = 0, 
-    LEMON_TRUE  = 1
-};
-
-namespace Symbol
-{
-/* Symbols (terminals and nonterminals) of the grammar are stored
-** in the following: */
-enum class symbol_type {
-    TERMINAL,
-    NONTERMINAL,
-    MULTITERMINAL
-};
-enum class e_assoc {
-    LEFT,
-    RIGHT,
-    NONE,
-    UNK
-};
-struct symbol {
-    const char* name;        /* Name of the symbol */
-    int index;               /* Index number for this symbol */
-    symbol_type type;   /* Symbols are all either TERMINALS or NTs */
-    rule* rule;       /* Linked list of rules of this (if an NT) */
-    symbol* fallback; /* fallback token in case this token doesn't parse */
-    int prec;                /* Precedence if defined (-1 otherwise) */
-    e_assoc assoc;      /* Associativity if precedence is defined */
-    char* firstset;          /* First-set for all rules of this symbol */
-    Boolean lambda;          /* True if NT and can generate an empty string */
-    int useCnt;              /* Number of times used */
-    char* destructor;        /* Code which executes whenever this symbol is
-                             ** popped from the stack during error processing */
-    int destLineno;          /* Line number for start of destructor.  Set to
-                             ** -1 for duplicate destructors. */
-    char* datatype;          /* The data type of information held by this
-                             ** object. Only used if type==NONTERMINAL */
-    int dtnum;               /* The data type number.  In the parser, the value
-                             ** stack is a union.  The .yy%d element of this
-                             ** union is the correct data type for this object */
-    int bContent;            /* True if this symbol ever carries content - if
-                             ** it is ever more than just syntax */
-                             /* The following fields are used by MULTITERMINALs only */
-    int nsubsym;             /* Number of constituent symbols in the MULTI */
-    symbol** subsym;  /* Array of constituent symbols */
-};
-}
-using namespace Symbol;
-
-namespace Rule
-{
-/* Each production rule in the grammar is stored in the following
-** structure.  */
-struct rule {
-    symbol* lhs;      /* Left-hand side of the rule */
-    const char* lhsalias;    /* Alias for the LHS (NULL if none) */
-    int lhsStart;            /* True if left-hand side is the start symbol */
-    int ruleline;            /* Line number for the rule */
-    int nrhs;                /* Number of RHS symbols */
-    symbol** rhs;     /* The RHS symbols */
-    const char** rhsalias;   /* An alias for each RHS symbol (NULL if none) */
-    int line;                /* Line number at which code begins */
-    const char* code;        /* The code executed when this rule is reduced */
-    const char* codePrefix;  /* Setup code before code[] above */
-    const char* codeSuffix;  /* Breakdown code after code[] above */
-    symbol* precsym;  /* Precedence symbol for this rule */
-    int index;               /* An index number for this rule */
-    int iRule;               /* Rule number as used in the generated tables */
-    Boolean noCode;          /* True if this rule has no associated C code */
-    Boolean codeEmitted;     /* True if the code has been emitted already */
-    Boolean canReduce;       /* True if this rule is ever reduced */
-    Boolean doesReduce;      /* Reduce actions occur after optimization */
-    Boolean neverReduce;     /* Reduce is theoretically possible, but prevented
-                             ** by actions or other outside implementation */
-    rule* nextlhs;    /* Next rule with the same LHS */
-    rule* next;       /* Next rule in the global list */
-};
-}
-using namespace Rule;
-
-namespace State
-{
-struct state;
-}
-using namespace State;
-
-namespace Config
-{
-/* A configuration is a production rule of the grammar together with
-** a mark (dot) showing how much of that rule has been processed so far.
-** Configurations also contain a follow-set which is a list of terminal
-** symbols which are allowed to immediately follow the end of the rule.
-** Every configuration is recorded as an instance of the following: */
-enum class cfgstatus {
-    COMPLETE,
-    INCOMPLETE
-};
-struct config {
-    rule* rp;         /* The rule upon which the configuration is based */
-    int dot;                 /* The parse point */
-    char* fws;               /* Follow-set for this configuration only */
-    plink* fplp;      /* Follow-set forward propagation links */
-    plink* bplp;      /* Follow-set backwards propagation links */
-    state* stp;       /* Pointer to state which contains this */
-    cfgstatus status;   /* used during followset and shift computations */
-    config* next;     /* Next configuration in the state */
-    config* bp;       /* The next basis configuration */
-};
-
-}
-using namespace Config;
-
-namespace Action
-{
-enum class e_action {
-    SHIFT,
-    ACCEPT,
-    REDUCE,
-    ERROR,
-    SSCONFLICT,              /* A shift/shift conflict */
-    SRCONFLICT,              /* Was a reduce, but part of a conflict */
-    RRCONFLICT,              /* Was a reduce, but part of a conflict */
-    SH_RESOLVED,             /* Was a shift.  Precedence resolved conflict */
-    RD_RESOLVED,             /* Was reduce.  Precedence resolved conflict */
-    NOT_USED,                /* Deleted by compression */
-    SHIFTREDUCE              /* Shift first, then reduce */
-};
-
-/* Every shift or reduce operation is stored as one of the following */
-struct action {
-    symbol* sp;       /* The look-ahead symbol */
-    e_action type;
-    union {
-        state* stp;     /* The new state, if a shift */
-        rule* rp;       /* The rule, if a reduce */
-    } x;
-    symbol* spOpt;    /* SHIFTREDUCE optimization to this symbol */
-    action* next;     /* Next action for this state */
-    action* collide;  /* Next action with the same hash */
-};
-
-}
-using namespace Action;
-
-namespace State
-{
-/* Each state of the generated parser's finite state machine
-** is encoded as an instance of the following structure. */
-struct state {
-    config* bp;       /* The basis configurations for this state */
-    config* cfp;      /* All configurations in this set */
-    int statenum;            /* Sequential number for this state */
-    action* ap;       /* List of actions for this state */
-    int nTknAct, nNtAct;     /* Number of actions on terminals and nonterminals */
-    int iTknOfst, iNtOfst;   /* yy_action[] offset for terminals and nonterms */
-    int iDfltReduce;         /* Default action is to REDUCE by this rule */
-    rule* pDfltReduce;/* The default REDUCE rule. */
-    int autoReduce;          /* True if this is an auto-reduce state */
-};
-
-state* State_new();
-void State_init();
-int State_insert(state*, config*);
-state* State_find(config*);
-state** State_arrayof();
-}
-using namespace State;
-
 #define NO_OFFSET (-2147483647)
 
-namespace Plink
-{
-/* A followset propagation link indicates that the contents of one
-** configuration followset should be propagated to another whenever
-** the first changes. */
-struct plink {
-    config* cfp;      /* The configuration to which linked */
-    plink* next;      /* The next propagate link */
-};
-}
-using namespace Plink;
-
-/* The state vector for the entire parser generator is recorded as
-** follows.  (LEMON uses no global variables and makes little use of
-** static variables.  Fields in the following structure can be thought
-** of as begin global variables in the program.) */
-struct lemon {
-    state** sorted;   /* Table of states sorted by state number */
-    Rule::rule* rule;       /* List of all rules */
-    Rule::rule* startRule;  /* First rule */
-    int nstate;              /* Number of states */
-    int nxstate;             /* nstate with tail degenerate states removed */
-    int nrule;               /* Number of rules */
-    int nruleWithAction;     /* Number of rules with actions */
-    int nsymbol;             /* Number of terminal and nonterminal symbols */
-    int nterminal;           /* Number of terminal symbols */
-    int minShiftReduce;      /* Minimum shift-reduce action value */
-    int errAction;           /* Error action value */
-    int accAction;           /* Accept action value */
-    int noAction;            /* No-op action value */
-    int minReduce;           /* Minimum reduce action */
-    int maxAction;           /* Maximum action value of any kind */
-    symbol** symbols; /* Sorted array of pointers to symbols */
-    int errorcnt;            /* Number of errors */
-    symbol* errsym;   /* The error symbol */
-    symbol* wildcard; /* Token that matches anything */
-    char* name;              /* Name of the generated parser */
-    char* arg;               /* Declaration of the 3rd argument to parser */
-    char* ctx;               /* Declaration of 2nd argument to constructor */
-    char* tokentype;         /* Type of terminal symbols in the parser stack */
-    char* vartype;           /* The default type of non-terminal symbols */
-    char* start;             /* Name of the start symbol for the grammar */
-    char* stacksize;         /* Size of the parser stack */
-    char* include;           /* Code to put at the start of the C file */
-    char* error;             /* Code to execute when an error is seen */
-    char* overflow;          /* Code to execute on a stack overflow */
-    char* failure;           /* Code to execute on parser failure */
-    char* accept;            /* Code to execute when the parser excepts */
-    char* extracode;         /* Code appended to the generated file */
-    char* tokendest;         /* Code to execute to destroy token data */
-    char* vardest;           /* Code for the default non-terminal destructor */
-    char* filename;          /* Name of the input file */
-    char* outname;           /* Name of the current output file */
-    char* tokenprefix;       /* A prefix added to token names in the .h file */
-    int nconflict;           /* Number of parsing conflicts */
-    int nactiontab;          /* Number of entries in the yy_action[] table */
-    int nlookaheadtab;       /* Number of entries in yy_lookahead[] */
-    int tablesize;           /* Total table size of all tables in bytes */
-    int basisflag;           /* Print only basis configurations */
-    int printPreprocessed;   /* Show preprocessor output on stdout */
-    int has_fallback;        /* True if any %fallback is seen in the grammar */
-    int nolinenosflag;       /* True if #line statements should not be printed */
-    char* argv0;             /* Name of the program */
-};
 
 #define MemoryCheck(X) if((X)==nullptr){ \
   memory_error(); \
@@ -527,51 +250,18 @@ struct lemon {
 ** Code for processing tables in the LEMON parser generator.
 */
 /* Routines for handling a strings */
-
 const char* Strsafe(const char*);
-
 void Strsafe_init(void);
 int Strsafe_insert(const char*);
 const char* Strsafe_find(const char*);
 
-namespace Symbol
+namespace Action
 {
-/* Routines for handling symbols of the grammar */
-
-symbol* Symbol_new(const char*);
-int Symbolcmpp(const void*, const void*);
-void Symbol_init(void);
-int Symbol_insert(symbol*, const char*);
-symbol* Symbol_find(const char*);
-symbol* Symbol_Nth(int);
-int Symbol_count(void);
-symbol** Symbol_arrayof(void);
-}
-using namespace Symbol;
-
-/* Routines to manage the state table */
-namespace Config
-{
-int Configcmp(const char*, const char*);
-}
-using namespace Config;
-
-namespace Configtable
-{
-/* Routines used for efficiency in Configlist_add */
-void Configtable_init(void);
-int Configtable_insert(config*);
-config* Configtable_find(const config*);
-void Configtable_clear(int(*)(config*));
-}
-using namespace Configtable;
-/****************** From the file "action.c" *******************************/
 /*
 ** Routines processing parser actions in the LEMON parser generator.
 */
 
-namespace Action
-{
+
 /* Allocate a new parser action */
 static action* Action_new(void) {
     static action* actionfreelist = nullptr;
@@ -1042,7 +732,7 @@ void FindStates(lemon& lemp)
     ** is all rules which have the start symbol as their
     ** left-hand side */
     for (rp = sp->rule; rp; rp = rp->nextlhs) {
-        struct config* newcfp;
+        config* newcfp;
         rp->lhsStart = 1;
         newcfp = Configlist_addbasis(rp, 0);
         SetAdd(newcfp->fws, 0);
@@ -1287,7 +977,7 @@ void FindActions(lemon& lemp)
 
     /* Resolve conflicts */
     for (i = 0; i < lemp.nstate; i++) {
-        struct action* ap, * nap;
+        action* ap, * nap;
         stp = lemp.sorted[i];
         /* assert( stp->ap ); */
         stp->ap = Action_sort(stp->ap);
@@ -1303,7 +993,7 @@ void FindActions(lemon& lemp)
     /* Report an error for each rule that can never be reduced. */
     for (rp = lemp.rule; rp; rp = rp->next) rp->canReduce = Boolean::LEMON_FALSE;
     for (i = 0; i < lemp.nstate; i++) {
-        struct action* ap;
+        action* ap;
         for (ap = lemp.sorted[i]->ap; ap; ap = ap->next) {
             if (ap->type == e_action::REDUCE) ap->x.rp->canReduce = Boolean::LEMON_TRUE;
         }
@@ -1332,7 +1022,7 @@ static int resolve_conflict(
     action* apx,
     action* apy
 ) {
-    struct symbol* spx, * spy;
+    symbol* spx, * spy;
     int errcnt = 0;
     assert(apx->sp == apy->sp);  /* Otherwise there would be no conflict */
     if (apx->type == e_action::SHIFT && apy->type == e_action::SHIFT) {
@@ -1684,8 +1374,8 @@ static void handle_T_option(const char* z) {
 
 /* Merge together to lists of rules ordered by rule.iRule */
 static rule* Rule_merge(rule* pA, rule* pB) {
-    struct rule* pFirst = nullptr;
-    struct rule** ppPrev = &pFirst;
+    rule* pFirst = nullptr;
+    rule** ppPrev = &pFirst;
     while (pA && pB) {
         if (pA->iRule < pB->iRule) {
             *ppPrev = pA;
@@ -1712,8 +1402,8 @@ static rule* Rule_merge(rule* pA, rule* pB) {
 */
 static rule* Rule_sort(rule* rp) {
     unsigned int i;
-    struct rule* pNext;
-    struct rule* x[32];
+    rule* pNext;
+    rule* x[32];
     memset(x, 0, sizeof(x));
     while (rp) {
         pNext = rp->next;
@@ -1786,7 +1476,7 @@ int main(int argc, char** argv) {
     int i;
     int exitcode;
     lemon lem;
-    struct rule* rp;
+    rule* rp;
 
     (void)argc;
     OptInit(*argv, options, stderr);
@@ -2525,9 +2215,9 @@ static void parseonetoken(pstate* psp)
         break;
     case e_state::IN_RHS:
         if (x[0] == '.') {
-            struct rule* rp;
-            rp = (struct rule*)calloc(sizeof(struct rule) +
-                sizeof(struct symbol*) * psp->nrhs + sizeof(char*) * psp->nrhs, 1);
+            rule* rp;
+            rp = (rule*)calloc(sizeof(rule) +
+                sizeof(symbol*) * psp->nrhs + sizeof(char*) * psp->nrhs, 1);
             if (rp == nullptr) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
                     "Can't allocate enough memory for this rule.");
@@ -2537,7 +2227,7 @@ static void parseonetoken(pstate* psp)
             else {
                 int i;
                 rp->ruleline = psp->tokenlineno;
-                rp->rhs = (struct symbol**)&rp[1];
+                rp->rhs = (symbol**)&rp[1];
                 rp->rhsalias = (const char**)&(rp->rhs[psp->nrhs]);
                 for (i = 0; i < psp->nrhs; i++) {
                     rp->rhs[i] = psp->rhs[i];
@@ -2580,21 +2270,21 @@ static void parseonetoken(pstate* psp)
             }
         }
         else if ((x[0] == '|' || x[0] == '/') && psp->nrhs > 0 && ISUPPER(x[1])) {
-            struct symbol* msp = psp->rhs[psp->nrhs - 1];
+            symbol* msp = psp->rhs[psp->nrhs - 1];
             if (msp->type != symbol_type::MULTITERMINAL) {
-                struct symbol* origsp = msp;
-                msp = (struct symbol*)calloc(1, sizeof(*msp));
+                symbol* origsp = msp;
+                msp = (symbol*)calloc(1, sizeof(*msp));
                 memset(msp, 0, sizeof(*msp));
                 msp->type = symbol_type::MULTITERMINAL;
                 msp->nsubsym = 1;
-                msp->subsym = (struct symbol**)calloc(1, sizeof(struct symbol*));
+                msp->subsym = (symbol**)calloc(1, sizeof(symbol*));
                 msp->subsym[0] = origsp;
                 msp->name = origsp->name;
                 psp->rhs[psp->nrhs - 1] = msp;
             }
             msp->nsubsym++;
-            msp->subsym = (struct symbol**)realloc(msp->subsym,
-                sizeof(struct symbol*) * msp->nsubsym);
+            msp->subsym = (symbol**)realloc(msp->subsym,
+                sizeof(symbol*) * msp->nsubsym);
             msp->subsym[msp->nsubsym - 1] = Symbol_new(&x[1]);
             if (ISLOWER(x[1]) || ISLOWER(msp->subsym[0]->name[0])) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
@@ -2755,7 +2445,7 @@ static void parseonetoken(pstate* psp)
             psp->state = e_state::RESYNC_AFTER_DECL_ERROR;
         }
         else {
-            struct symbol* sp = Symbol_new(x);
+            symbol* sp = Symbol_new(x);
             psp->declargslot = &sp->destructor;
             psp->decllinenoslot = &sp->destLineno;
             psp->insertLineMacro = 1;
@@ -2770,7 +2460,7 @@ static void parseonetoken(pstate* psp)
             psp->state = e_state::RESYNC_AFTER_DECL_ERROR;
         }
         else {
-            struct symbol* sp = Symbol_find(x);
+            symbol* sp = Symbol_find(x);
             if ((sp) && (sp->datatype)) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
                     "Symbol %%type \"%s\" already defined", x);
@@ -2792,7 +2482,7 @@ static void parseonetoken(pstate* psp)
             psp->state = e_state::WAITING_FOR_DECL_OR_RULE;
         }
         else if (ISUPPER(x[0])) {
-            struct symbol* sp;
+            symbol* sp;
             sp = Symbol_new(x);
             if (sp->prec >= 0) {
                 ErrorMsg(psp->filename, psp->tokenlineno,
@@ -2965,10 +2655,10 @@ static void parseonetoken(pstate* psp)
             psp->state = e_state::WAITING_FOR_DECL_OR_RULE;
         }
         else if (ISUPPER(x[0]) || ((x[0] == '|' || x[0] == '/') && ISUPPER(x[1]))) {
-            struct symbol* msp = psp->tkclass;
+            symbol* msp = psp->tkclass;
             msp->nsubsym++;
-            msp->subsym = (struct symbol**)realloc(msp->subsym,
-                sizeof(struct symbol*) * msp->nsubsym);
+            msp->subsym = (symbol**)realloc(msp->subsym,
+                sizeof(symbol*) * msp->nsubsym);
             if (!ISUPPER(x[0])) x++;
             msp->subsym[msp->nsubsym - 1] = Symbol_new(x);
         }
@@ -3161,7 +2851,7 @@ static void preprocess_input(char* z) {
 */
 void Parse(lemon& gp)
 {
-    struct pstate ps;
+    pstate ps;
     FILE* fp;
     char* filebuf;
     unsigned int filesize;
@@ -3331,13 +3021,13 @@ namespace Plink
 static plink* plink_freelist = nullptr;
 
 /* Allocate a new plink */
-struct plink* Plink_new(void) {
-    struct plink* newlink;
+plink* Plink_new(void) {
+    plink* newlink;
 
     if (plink_freelist == nullptr) {
         int i;
         int amt = 100;
-        plink_freelist = (struct plink*)calloc(amt, sizeof(struct plink));
+        plink_freelist = (plink*)calloc(amt, sizeof(plink));
         if (plink_freelist == nullptr) {
             fprintf(stderr,
                 "Unable to allocate memory for a new follow-set propagation link.\n");
@@ -3354,7 +3044,7 @@ struct plink* Plink_new(void) {
 /* Add a plink to a plink list */
 void Plink_add(plink** plpp, config* cfp)
 {
-    struct plink* newlink;
+    plink* newlink;
     newlink = Plink_new();
     newlink->next = *plpp;
     *plpp = newlink;
@@ -3364,7 +3054,7 @@ void Plink_add(plink** plpp, config* cfp)
 /* Transfer every plink on the list "from" to the list "to" */
 void Plink_copy(plink** to, plink* from)
 {
-    struct plink* nextpl;
+    plink* nextpl;
     while (from) {
         nextpl = from->next;
         from->next = *to;
@@ -3376,7 +3066,7 @@ void Plink_copy(plink** to, plink* from)
 /* Delete every plink on the list */
 void Plink_delete(plink* plp)
 {
-    struct plink* nextpl;
+    plink* nextpl;
 
     while (plp) {
         nextpl = plp->next;
@@ -3475,8 +3165,8 @@ void rule_print(FILE* out, const rule* rp) {
 ** on rules */
 void Reprint(lemon& lemp)
 {
-    struct rule* rp;
-    struct symbol* sp;
+    rule* rp;
+    symbol* sp;
     int i, j, maxlen, len, ncolumns, skip;
     printf("// Reprint of input file \"%s\".\n// Symbols:\n", lemp.filename);
     maxlen = 10;
@@ -3509,7 +3199,7 @@ void Reprint(lemon& lemp)
 /* Print a single rule.
 */
 void RulePrint(FILE* fp, rule* rp, int iCursor) {
-    struct symbol* sp;
+    symbol* sp;
     int i, j;
     fprintf(fp, "%s ::=", rp->lhs->name);
     for (i = 0; i <= rp->nrhs; i++) {
@@ -4074,7 +3764,7 @@ PRIVATE char* append_str(const char* zText, int n, int p1, int p2) {
 ** Return 1 if the expanded code requires that "yylhsminor" local variable
 ** to be defined.
 */
-PRIVATE int translate_code(lemon& lemp, struct rule* rp) {
+PRIVATE int translate_code(lemon& lemp, rule* rp) {
     char* cp, * xp;
     int i;
     int rc = 0;            /* True if yylhsminor is used */
@@ -4381,7 +4071,7 @@ void print_stack_union(
     ** a datatype using the %type directive.
     */
     for (i = 0; i < lemp.nsymbol; i++) {
-        struct symbol* sp = lemp.symbols[i];
+        symbol* sp = lemp.symbols[i];
         char* cp;
         if (sp == lemp.errsym) {
             sp->dtnum = arraysize + 1;
@@ -4542,10 +4232,10 @@ void ReportTable(
     FILE* out, * in, * sql;
     char line[LINESIZE];
     int  lineno;
-    struct state* stp;
-    struct action* ap;
-    struct rule* rp;
-    struct acttab* pActtab;
+    state* stp;
+    action* ap;
+    rule* rp;
+    acttab* pActtab;
     int i, j, n, sz;
     int nLookAhead;
     int szActionType;     /* sizeof(YYACTIONTYPE) */
@@ -4553,7 +4243,7 @@ void ReportTable(
     const char* name;
     int mnTknOfst, mxTknOfst;
     int mnNtOfst, mxNtOfst;
-    struct axset* ax;
+    axset* ax;
     const char* prefix;
 
     lemp.minShiftReduce = lemp.nstate;
@@ -4769,7 +4459,7 @@ void ReportTable(
     ** table must be computed before generating the YYNSTATE macro because
     ** we need to know how many states can be eliminated.
     */
-    ax = (struct axset*)calloc(lemp.nxstate * 2, sizeof(ax[0]));
+    ax = (axset*)calloc(lemp.nxstate * 2, sizeof(ax[0]));
     if (ax == nullptr) {
         fprintf(stderr, "malloc failed\n");
         exit(1);
@@ -5074,10 +4764,10 @@ void ReportTable(
         }
     }
     if (lemp.vardest) {
-        struct symbol* dflt_sp = nullptr;
+        symbol* dflt_sp = nullptr;
         int once = 1;
         for (i = 0; i < lemp.nsymbol; i++) {
-            struct symbol* sp = lemp.symbols[i];
+            symbol* sp = lemp.symbols[i];
             if (sp == nullptr || sp->type == symbol_type::TERMINAL ||
                 sp->index <= 0 || sp->destructor != nullptr) continue;
             if (once) {
@@ -5100,7 +4790,7 @@ void ReportTable(
 
         /* Combine duplicate destructors into a single case */
         for (j = i + 1; j < lemp.nsymbol; j++) {
-            struct symbol* sp2 = lemp.symbols[j];
+            symbol* sp2 = lemp.symbols[j];
             if (sp2 && sp2->type != symbol_type::TERMINAL && sp2->destructor
                 && sp2->dtnum == sp->dtnum
                 && strcmp(sp->destructor, sp2->destructor) == 0) {
@@ -5148,7 +4838,7 @@ void ReportTable(
     }
     /* First output rules other than the default: rule */
     for (rp = lemp.rule; rp; rp = rp->next) {
-        struct rule* rp2;               /* Other rules with the same action */
+        rule* rp2;               /* Other rules with the same action */
         if (rp->codeEmitted == Boolean::LEMON_TRUE) continue;
         if (rp->noCode == Boolean::LEMON_TRUE) {
             /* No C code actions, so this will be part of the "default:" rule */
@@ -5260,9 +4950,9 @@ void ReportHeader(lemon& lemp)
 */
 void CompressTables(lemon& lemp)
 {
-    struct state* stp;
-    struct action* ap, * ap2, * nextap;
-    struct rule* rp, * rp2, * rbest;
+    state* stp;
+    action* ap, * ap2, * nextap;
+    rule* rp, * rp2, * rbest;
     int nbest, n;
     int i;
     int usesWildcard;
@@ -5329,7 +5019,7 @@ void CompressTables(lemon& lemp)
     for (i = 0; i < lemp.nstate; i++) {
         stp = lemp.sorted[i];
         for (ap = stp->ap; ap; ap = ap->next) {
-            struct state* pNextState;
+            state* pNextState;
             if (ap->type != e_action::SHIFT) continue;
             pNextState = ap->x.stp;
             if (pNextState->autoReduce && pNextState->pDfltReduce != nullptr) {
@@ -5656,11 +5346,11 @@ namespace Symbol
 */
 symbol* Symbol_new(const char* x)
 {
-    struct symbol* sp;
+    symbol* sp;
 
     sp = Symbol_find(x);
     if (sp == nullptr) {
-        sp = (struct symbol*)calloc(1, sizeof(struct symbol));
+        sp = (symbol*)calloc(1, sizeof(symbol));
         MemoryCheck(sp);
         sp->name = Strsafe(x);
         sp->type = ISUPPER(*x) ? symbol_type::TERMINAL : symbol_type::NONTERMINAL;
@@ -5696,8 +5386,8 @@ symbol* Symbol_new(const char* x)
 */
 int Symbolcmpp(const void* _a, const void* _b)
 {
-    const struct symbol* a = *(const struct symbol**)_a;
-    const struct symbol* b = *(const struct symbol**)_b;
+    const symbol* a = *(const symbol**)_a;
+    const symbol* b = *(const symbol**)_b;
     const int i1 = a->type == symbol_type::MULTITERMINAL ? 3 : a->name[0] > 'Z' ? 2 : 1;
     const int i2 = b->type == symbol_type::MULTITERMINAL ? 3 : b->name[0] > 'Z' ? 2 : 1;
     return i1 == i2 ? a->index - b->index : i1 - i2;
@@ -5774,7 +5464,7 @@ int Symbol_insert(symbol* data, const char* key)
     if (x2a->count >= x2a->size) {
         /* Need to make the hash table bigger */
         int i, arrSize;
-        struct s_x2 array;
+        s_x2 array;
         array.size = arrSize = x2a->size * 2;
         array.count = x2a->count;
         array.tbl = (x2node*)calloc(arrSize, sizeof(x2node) + sizeof(x2node*));
@@ -5867,8 +5557,8 @@ namespace Config
 /* Compare two configurations */
 int Configcmp(const char* _a, const char* _b)
 {
-    const struct config* a = (struct config*)_a;
-    const struct config* b = (config*)_b;
+    const config* a = (config*)_a;
+    const config* b = (config*)_b;
     int x;
     x = a->rp->index - b->rp->index;
     if (x == 0) x = a->dot - b->dot;
@@ -5915,8 +5605,8 @@ PRIVATE unsigned statehash(config* a)
 /* Allocate a new state structure */
 state* State_new()
 {
-    struct state* newstate;
-    newstate = (struct state*)calloc(1, sizeof(struct state));
+    state* newstate;
+    newstate = (state*)calloc(1, sizeof(state));
     MemoryCheck(newstate);
     return newstate;
 }
@@ -5990,7 +5680,7 @@ int State_insert(state* data, config* key)
     if (x3a->count >= x3a->size) {
         /* Need to make the hash table bigger */
         int i, arrSize;
-        struct s_x3 array;
+        s_x3 array;
         array.size = arrSize = x3a->size * 2;
         array.count = x3a->count;
         array.tbl = (x3node*)calloc(arrSize, sizeof(x3node) + sizeof(x3node*));
@@ -6046,11 +5736,11 @@ state* State_find(config* key)
 ** problems, or if the array is empty. */
 state** State_arrayof(void)
 {
-    struct state** array;
+    state** array;
     int i, arrSize;
     if (x3a == nullptr) return 0;
     arrSize = x3a->count;
-    array = (struct state**)calloc(arrSize, sizeof(struct state*));
+    array = (state**)calloc(arrSize, sizeof(state*));
     if (array) {
         for (i = 0; i < arrSize; i++) array[i] = x3a->tbl[i].data;
     }
