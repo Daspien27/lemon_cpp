@@ -646,7 +646,7 @@ void FindFirstSets(lemon& lemp)
             if (rp->lhs->lambda == Boolean::LEMON_TRUE) continue;
             for (i = 0; i < rp->nrhs; i++) {
                 const symbol* sp = rp->rhs[i];
-                assert(sp->type == NONTERMINAL || sp->lambda == LEMON_FALSE);
+                assert(sp->type == symbol_type::NONTERMINAL || sp->lambda == Boolean::LEMON_FALSE);
                 if (sp->lambda == Boolean::LEMON_FALSE) break;
             }
             if (i == rp->nrhs) {
@@ -1053,7 +1053,7 @@ static int resolve_conflict(
             apx->type = e_action::SH_RESOLVED;
         }
         else {
-            assert(spx->prec == spy->prec && spx->assoc == NONE);
+            assert(spx->prec == spy->prec && spx->assoc == e_assoc::NONE);
             apx->type = e_action::ERROR;
         }
     }
@@ -1074,16 +1074,16 @@ static int resolve_conflict(
     }
     else {
         assert(
-            apx->type == SH_RESOLVED ||
-            apx->type == RD_RESOLVED ||
-            apx->type == SSCONFLICT ||
-            apx->type == SRCONFLICT ||
-            apx->type == RRCONFLICT ||
-            apy->type == SH_RESOLVED ||
-            apy->type == RD_RESOLVED ||
-            apy->type == SSCONFLICT ||
-            apy->type == SRCONFLICT ||
-            apy->type == RRCONFLICT
+            apx->type == e_action::SH_RESOLVED ||
+            apx->type == e_action::RD_RESOLVED ||
+            apx->type == e_action::SSCONFLICT ||
+            apx->type == e_action::SRCONFLICT ||
+            apx->type == e_action::RRCONFLICT ||
+            apy->type == e_action::SH_RESOLVED ||
+            apy->type == e_action::RD_RESOLVED ||
+            apy->type == e_action::SSCONFLICT ||
+            apy->type == e_action::SRCONFLICT ||
+            apy->type == e_action::RRCONFLICT
         );
         /* The REDUCE/SHIFT case cannot happen because SHIFTs come before
         ** REDUCEs on the list.  If we reach this point it must be because
@@ -1532,11 +1532,11 @@ int main(int argc, char** argv) {
     });
 
     auto first_non_multiterminal = std::find_if(lem.symbols.rbegin(), lem.symbols.rend(), [](const auto& sp) {
-        return sp->type == symbol_type::MULTITERMINAL;
+        return sp->type != symbol_type::MULTITERMINAL;
         });
-    lem.nsymbol = std::distance(first_non_multiterminal, lem.symbols.rend());
+    lem.nsymbol = std::distance(first_non_multiterminal, lem.symbols.rend()) - 1;
 
-    assert(strcmp(lem.symbols[i]->name, "{default}") == 0);
+    assert(strcmp(lem.symbols[lem.nsymbol]->name, "{default}") == 0);
 
     auto last_terminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
         return !ISUPPER(sp->name[0]);
@@ -4884,7 +4884,7 @@ void ReportTable(
     fprintf(out, "      default:\n"); lineno++;
     for (rp = lemp.rule; rp; rp = rp->next) {
         if (rp->codeEmitted == Boolean::LEMON_TRUE) continue;
-        assert(rp->noCode);
+        assert(rp->noCode == Boolean::LEMON_TRUE);
         fprintf(out, "      /* (%d) ", rp->iRule);
         writeRuleText(out, rp);
         if (rp->neverReduce == Boolean::LEMON_TRUE) {

@@ -22,7 +22,7 @@ namespace regression
 		
 		bool compare_original_cpp(const std::string_view& file)
 		{
-			
+
 			auto original_file = fs::path{ original } / file;
 			Assert::IsTrue(original_file.has_filename());
 
@@ -40,7 +40,7 @@ namespace regression
 
 			using isiter = std::istream_iterator<char>;
 
-			return std::lexicographical_compare(isiter{ original_file_s }, isiter{}, isiter{ cpp_file_s }, isiter{});
+			return std::equal(isiter{ original_file_s }, isiter{}, isiter{ cpp_file_s }, isiter{});
 		}
 
 		TEST_METHOD(sqlite_c)
