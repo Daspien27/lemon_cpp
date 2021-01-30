@@ -11,7 +11,7 @@
 #include "lemon.h"
 
 //Allows the use of fopen/getenv/sprintf
-#define _CRT_SECURE_NO_DEPRECATE
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -47,7 +47,10 @@ extern "C" {
 
 //C++ Headers
 #include <algorithm>
-
+#include <map>
+#include <string>
+#include <string_view>
+#include <vector>
 
 
 /* #define PRIVATE static */
@@ -1355,7 +1358,7 @@ static void handle_D_option(char* z) {
 */
 static char* outputDir = NULL;
 static void handle_d_option(const char* z) {
-    outputDir = new char[lemonStrlen(z) + 1];
+    outputDir = new char[lemonStrlen(z) + 1]; //std::string or std::string_view
     if (outputDir == nullptr) {
         fprintf(stderr, "out of memory\n");
         exit(1);
@@ -1515,14 +1518,27 @@ int main(int argc, char** argv) {
     Symbol_new("{default}");
     lem.nsymbol = Symbol_count();
     lem.symbols = Symbol_arrayof();
-    for (i = 0; i < lem.nsymbol; i++) lem.symbols[i]->index = i;
-    qsort(lem.symbols, lem.nsymbol, sizeof(symbol*), Symbolcmpp);
-    for (i = 0; i < lem.nsymbol; i++) lem.symbols[i]->index = i;
-    while (lem.symbols[i - 1]->type == symbol_type::MULTITERMINAL) { i--; }
-    assert(strcmp(lem.symbols[i - 1]->name, "{default}") == 0);
-    lem.nsymbol = i - 1;
-    for (i = 1; ISUPPER(lem.symbols[i]->name[0]); i++);
-    lem.nterminal = i;
+    std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
+        sp->index = i++;
+    });
+
+    std::sort(lem.symbols.begin(), lem.symbols.end(), &Symbolcmpp);
+
+    std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
+        sp->index = i++;
+    });
+
+    auto first_non_multiterminal = std::find_if(lem.symbols.rbegin(), lem.symbols.rend(), [](const auto& sp) {
+        return sp->type == symbol_type::MULTITERMINAL;
+        });
+    lem.nsymbol = std::distance(lem.symbols.rbegin(), first_non_multiterminal);
+
+    assert(strcmp(lem.symbols[i]->name, "{default}") == 0);
+
+    auto last_terminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
+        return !ISUPPER(sp->name[0]);
+        });
+    lem.nterminal = std::distance(lem.symbols.begin(), last_terminal) - 1;
 
     /* Assign sequential rule numbers.  Start with 0.  Put rules that have no
     ** reduce action C-code associated with them last, so that the switch()
@@ -2089,7 +2105,7 @@ static void parseonetoken(pstate* psp)
         psp->preccounter = 0;
         psp->firstrule = psp->lastrule = nullptr;
         psp->gp->nrule = 0;
-        /* fall through */
+        [[fallthrough]];
     case e_state::WAITING_FOR_DECL_OR_RULE:
         if (x[0] == '%') {
             psp->state = e_state::WAITING_FOR_DECL_KEYWORD;
@@ -3764,7 +3780,7 @@ PRIVATE char* append_str(const char* zText, int n, int p1, int p2) {
 ** Return 1 if the expanded code requires that "yylhsminor" local variable
 ** to be defined.
 */
-PRIVATE int translate_code(lemon& lemp, rule* rp) {
+PRIVATE int translate_code(lemon& lemp, rule& rp) {
     char* cp, * xp;
     int i;
     int rc = 0;            /* True if yylhsminor is used */
@@ -3776,59 +3792,59 @@ PRIVATE int translate_code(lemon& lemp, rule* rp) {
     char zLhs[50];         /* Convert the LHS symbol into this string */
     char zOvwrt[900];      /* Comment that to allow LHS to overwrite RHS */
 
-    for (i = 0; i < rp->nrhs; i++) used[i] = 0;
+    for (i = 0; i < rp.nrhs; i++) used[i] = 0;
     lhsused = 0;
 
-    if (rp->code == nullptr) {
+    if (rp.code == nullptr) {
         static char newlinestr[2] = { '\n', '\0' };
-        rp->code = newlinestr;
-        rp->line = rp->ruleline;
-        rp->noCode = Boolean::LEMON_TRUE;
+        rp.code = newlinestr;
+        rp.line = rp.ruleline;
+        rp.noCode = Boolean::LEMON_TRUE;
     }
     else {
-        rp->noCode = Boolean::LEMON_FALSE;
+        rp.noCode = Boolean::LEMON_FALSE;
     }
 
 
-    if (rp->nrhs == 0) {
+    if (rp.nrhs == 0) {
         /* If there are no RHS symbols, then writing directly to the LHS is ok */
         lhsdirect = 1;
     }
-    else if (rp->rhsalias[0] == nullptr) {
+    else if (rp.rhsalias[0] == nullptr) {
         /* The left-most RHS symbol has no value.  LHS direct is ok.  But
         ** we have to call the destructor on the RHS symbol first. */
         lhsdirect = 1;
         //                    v better not be a nullptr
-        if (has_destructor(*rp->rhs[0], lemp)) {
+        if (has_destructor(*rp.rhs[0], lemp)) {
             append_str(nullptr, 0, 0, 0);
             append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
-                rp->rhs[0]->index, 1 - rp->nrhs);
-            rp->codePrefix = Strsafe(append_str(nullptr, 0, 0, 0));
-            rp->noCode = Boolean::LEMON_FALSE;
+                rp.rhs[0]->index, 1 - rp.nrhs);
+            rp.codePrefix = Strsafe(append_str(nullptr, 0, 0, 0));
+            rp.noCode = Boolean::LEMON_FALSE;
         }
     }
-    else if (rp->lhsalias == nullptr) {
+    else if (rp.lhsalias == nullptr) {
         /* There is no LHS value symbol. */
         lhsdirect = 1;
     }
-    else if (strcmp(rp->lhsalias, rp->rhsalias[0]) == 0) {
+    else if (strcmp(rp.lhsalias, rp.rhsalias[0]) == 0) {
         /* The LHS symbol and the left-most RHS symbol are the same, so
         ** direct writing is allowed */
         lhsdirect = 1;
         lhsused = 1;
         used[0] = 1;
-        if (rp->lhs->dtnum != rp->rhs[0]->dtnum) {
-            ErrorMsg(lemp.filename, rp->ruleline,
+        if (rp.lhs->dtnum != rp.rhs[0]->dtnum) {
+            ErrorMsg(lemp.filename, rp.ruleline,
                 "%s(%s) and %s(%s) share the same label but have "
                 "different datatypes.",
-                rp->lhs->name, rp->lhsalias, rp->rhs[0]->name, rp->rhsalias[0]);
+                rp.lhs->name, rp.lhsalias, rp.rhs[0]->name, rp.rhsalias[0]);
             lemp.errorcnt++;
         }
     }
     else {
         lemon_sprintf(zOvwrt, "/*%s-overwrites-%s*/",
-            rp->lhsalias, rp->rhsalias[0]);
-        zSkip = strstr(rp->code, zOvwrt);
+            rp.lhsalias, rp.rhsalias[0]);
+        zSkip = strstr(rp.code, zOvwrt);
         if (zSkip != nullptr) {
             /* The code contains a special comment that indicates that it is safe
             ** for the LHS label to overwrite left-most RHS label. */
@@ -3839,49 +3855,49 @@ PRIVATE int translate_code(lemon& lemp, rule* rp) {
         }
     }
     if (lhsdirect) {
-        sprintf(zLhs, "yymsp[%d].minor.yy%d", 1 - rp->nrhs, rp->lhs->dtnum);
+        sprintf(zLhs, "yymsp[%d].minor.yy%d", 1 - rp.nrhs, rp.lhs->dtnum);
     }
     else {
         rc = 1;
-        sprintf(zLhs, "yylhsminor.yy%d", rp->lhs->dtnum);
+        sprintf(zLhs, "yylhsminor.yy%d", rp.lhs->dtnum);
     }
 
     append_str(nullptr, 0, 0, 0);
 
     /* This const cast is wrong but harmless, if we're careful. */
-    for (cp = (char*)rp->code; *cp; cp++) {
+    for (cp = (char*)rp.code; *cp; cp++) {
         if (cp == zSkip) {
             append_str(zOvwrt, 0, 0, 0);
             cp += lemonStrlen(zOvwrt) - 1;
             dontUseRhs0 = 1;
             continue;
         }
-        if (ISALPHA(*cp) && (cp == rp->code || (!ISALNUM(cp[-1]) && cp[-1] != '_'))) {
+        if (ISALPHA(*cp) && (cp == rp.code || (!ISALNUM(cp[-1]) && cp[-1] != '_'))) {
             char saved;
             for (xp = &cp[1]; ISALNUM(*xp) || *xp == '_'; xp++);
             saved = *xp;
             *xp = 0;
-            if (rp->lhsalias && strcmp(cp, rp->lhsalias) == 0) {
+            if (rp.lhsalias && strcmp(cp, rp.lhsalias) == 0) {
                 append_str(zLhs, 0, 0, 0);
                 cp = xp;
                 lhsused = 1;
             }
             else {
-                for (i = 0; i < rp->nrhs; i++) {
-                    if (rp->rhsalias[i] && strcmp(cp, rp->rhsalias[i]) == 0) {
+                for (i = 0; i < rp.nrhs; i++) {
+                    if (rp.rhsalias[i] && strcmp(cp, rp.rhsalias[i]) == 0) {
                         if (i == 0 && dontUseRhs0) {
-                            ErrorMsg(lemp.filename, rp->ruleline,
+                            ErrorMsg(lemp.filename, rp.ruleline,
                                 "Label %s used after '%s'.",
-                                rp->rhsalias[0], zOvwrt);
+                                rp.rhsalias[0], zOvwrt);
                             lemp.errorcnt++;
                         }
-                        else if (cp != rp->code && cp[-1] == '@') {
+                        else if (cp != rp.code && cp[-1] == '@') {
                             /* If the argument is of the form @X then substituted
                             ** the token number of X, not the value of X */
-                            append_str("yymsp[%d].major", -1, i - rp->nrhs + 1, 0);
+                            append_str("yymsp[%d].major", -1, i - rp.nrhs + 1, 0);
                         }
                         else {
-                            const symbol* sp = rp->rhs[i];
+                            const symbol* sp = rp.rhs[i];
                             int dtnum;
                             if (sp->type == symbol_type::MULTITERMINAL) {
                                 dtnum = sp->subsym[0]->dtnum;
@@ -3889,7 +3905,7 @@ PRIVATE int translate_code(lemon& lemp, rule* rp) {
                             else {
                                 dtnum = sp->dtnum;
                             }
-                            append_str("yymsp[%d].minor.yy%d", 0, i - rp->nrhs + 1, dtnum);
+                            append_str("yymsp[%d].minor.yy%d", 0, i - rp.nrhs + 1, dtnum);
                         }
                         cp = xp;
                         used[i] = 1;
@@ -3904,59 +3920,59 @@ PRIVATE int translate_code(lemon& lemp, rule* rp) {
 
     /* Main code generation completed */
     cp = append_str(nullptr, 0, 0, 0);
-    if (cp && cp[0]) rp->code = Strsafe(cp);
+    if (cp && cp[0]) rp.code = Strsafe(cp);
     append_str(nullptr, 0, 0, 0);
 
     /* Check to make sure the LHS has been used */
-    if (rp->lhsalias && !lhsused) {
-        ErrorMsg(lemp.filename, rp->ruleline,
+    if (rp.lhsalias && !lhsused) {
+        ErrorMsg(lemp.filename, rp.ruleline,
             "Label \"%s\" for \"%s(%s)\" is never used.",
-            rp->lhsalias, rp->lhs->name, rp->lhsalias);
+            rp.lhsalias, rp.lhs->name, rp.lhsalias);
         lemp.errorcnt++;
     }
 
     /* Generate destructor code for RHS minor values which are not referenced.
     ** Generate error messages for unused labels and duplicate labels.
     */
-    for (i = 0; i < rp->nrhs; i++) {
-        if (rp->rhsalias[i]) {
+    for (i = 0; i < rp.nrhs; i++) {
+        if (rp.rhsalias[i]) {
             if (i > 0) {
                 int j;
-                if (rp->lhsalias && strcmp(rp->lhsalias, rp->rhsalias[i]) == 0) {
-                    ErrorMsg(lemp.filename, rp->ruleline,
+                if (rp.lhsalias && strcmp(rp.lhsalias, rp.rhsalias[i]) == 0) {
+                    ErrorMsg(lemp.filename, rp.ruleline,
                         "%s(%s) has the same label as the LHS but is not the left-most "
                         "symbol on the RHS.",
-                        rp->rhs[i]->name, rp->rhsalias[i]);
+                        rp.rhs[i]->name, rp.rhsalias[i]);
                     lemp.errorcnt++;
                 }
                 for (j = 0; j < i; j++) {
-                    if (rp->rhsalias[j] && strcmp(rp->rhsalias[j], rp->rhsalias[i]) == 0) {
-                        ErrorMsg(lemp.filename, rp->ruleline,
+                    if (rp.rhsalias[j] && strcmp(rp.rhsalias[j], rp.rhsalias[i]) == 0) {
+                        ErrorMsg(lemp.filename, rp.ruleline,
                             "Label %s used for multiple symbols on the RHS of a rule.",
-                            rp->rhsalias[i]);
+                            rp.rhsalias[i]);
                         lemp.errorcnt++;
                         break;
                     }
                 }
             }
             if (!used[i]) {
-                ErrorMsg(lemp.filename, rp->ruleline,
+                ErrorMsg(lemp.filename, rp.ruleline,
                     "Label %s for \"%s(%s)\" is never used.",
-                    rp->rhsalias[i], rp->rhs[i]->name, rp->rhsalias[i]);
+                    rp.rhsalias[i], rp.rhs[i]->name, rp.rhsalias[i]);
                 lemp.errorcnt++;
             }
         }
         //                                      v better not be a nullptr
-        else if (i > 0 && has_destructor(*rp->rhs[i], lemp)) {
+        else if (i > 0 && has_destructor(*rp.rhs[i], lemp)) {
             append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
-                rp->rhs[i]->index, i - rp->nrhs + 1);
+                rp.rhs[i]->index, i - rp.nrhs + 1);
         }
     }
 
     /* If unable to write LHS values directly into the stack, write the
     ** saved LHS value now. */
     if (lhsdirect == 0) {
-        append_str("  yymsp[%d].minor.yy%d = ", 0, 1 - rp->nrhs, rp->lhs->dtnum);
+        append_str("  yymsp[%d].minor.yy%d = ", 0, 1 - rp.nrhs, rp.lhs->dtnum);
         append_str(zLhs, 0, 0, 0);
         append_str(";\n", 0, 0, 0);
     }
@@ -3964,8 +3980,8 @@ PRIVATE int translate_code(lemon& lemp, rule* rp) {
     /* Suffix code generation complete */
     cp = append_str(nullptr, 0, 0, 0);
     if (cp && cp[0]) {
-        rp->codeSuffix = Strsafe(cp);
-        rp->noCode = Boolean::LEMON_FALSE;
+        rp.codeSuffix = Strsafe(cp);
+        rp.noCode = Boolean::LEMON_FALSE;
     }
 
     return rc;
@@ -4831,7 +4847,7 @@ void ReportTable(
     /* Generate code which execution during each REDUCE action */
     i = 0;
     for (rp = lemp.rule; rp; rp = rp->next) {
-        i += translate_code(lemp, rp);
+        i += translate_code(lemp, *rp);
     }
     if (i) {
         fprintf(out, "        YYMINORTYPE yylhsminor;\n"); lineno++;
@@ -5341,6 +5357,8 @@ const char* Strsafe_find(const char* key)
 
 namespace Symbol
 {
+static std::map<std::string_view, Symbol::symbol> x2a_map;
+
 /* Return a pointer to the (terminal or nonterminal) symbol "x".
 ** Create a new symbol if this is the first time "x" has been seen.
 */
@@ -5350,23 +5368,30 @@ symbol* Symbol_new(const char* x)
 
     sp = Symbol_find(x);
     if (sp == nullptr) {
-        sp = (symbol*)calloc(1, sizeof(symbol));
-        MemoryCheck(sp);
-        sp->name = Strsafe(x);
-        sp->type = ISUPPER(*x) ? symbol_type::TERMINAL : symbol_type::NONTERMINAL;
-        sp->rule = nullptr;
-        sp->fallback = nullptr;
-        sp->prec = -1;
-        sp->assoc = e_assoc::UNK;
-        sp->firstset = nullptr;
-        sp->lambda = Boolean::LEMON_FALSE;
-        sp->destructor = nullptr;
-        sp->destLineno = 0;
-        sp->datatype = nullptr;
-        sp->useCnt = 0;
-        Symbol_insert(sp, sp->name);
+        symbol s;
+
+        s.name = Strsafe(x);
+        s.index = 0;
+        s.type = ISUPPER(*x) ? symbol_type::TERMINAL : symbol_type::NONTERMINAL;
+        s.rule = nullptr;
+        s.fallback = nullptr;
+        s.prec = -1;
+        s.assoc = e_assoc::UNK;
+        s.firstset = nullptr;
+        s.lambda = Boolean::LEMON_FALSE;
+        s.useCnt = 0;
+        s.destructor = nullptr;
+        s.destLineno = 0;
+        s.datatype = nullptr;
+        s.dtnum = 0;
+        s.bContent = 0;
+        s.nsubsym = 0;
+        s.subsym = nullptr;
+
+        auto [inserted_s, e] = x2a_map.emplace(s.name, s);
+        sp = &inserted_s->second;
     }
-    sp->useCnt++;
+    ++sp->useCnt;
     return sp;
 }
 
@@ -5384,170 +5409,47 @@ symbol* Symbol_new(const char* x)
 ** order (the order they appeared in the grammar file) gives the
 ** smallest parser tables in SQLite.
 */
-int Symbolcmpp(const void* _a, const void* _b)
+bool Symbolcmpp(const symbol* a, const symbol* b)
 {
-    const symbol* a = *(const symbol**)_a;
-    const symbol* b = *(const symbol**)_b;
     const int i1 = a->type == symbol_type::MULTITERMINAL ? 3 : a->name[0] > 'Z' ? 2 : 1;
     const int i2 = b->type == symbol_type::MULTITERMINAL ? 3 : b->name[0] > 'Z' ? 2 : 1;
-    return i1 == i2 ? a->index - b->index : i1 - i2;
+    
+    return i1 == i2 ? a->index < b->index : i1 < i2;
 }
-
-
-/* There is one instance of this structure for every data element
-** in an associative array of type "x2".
-*/
-struct s_x2node {
-    symbol* data;     /* The data */
-    const char* key;         /* The key */
-    s_x2node* next;   /* Next entry with the same hash */
-    s_x2node** from;  /* Previous link */
-};
-
-using x2node = s_x2node;
-
-/* There is one instance of the following structure for each
-** associative array of type "x2".
-*/
-struct s_x2 {
-    int size;               /* The number of available slots. */
-                            /*   Must be a power of 2 greater than or */
-                            /*   equal to 1 */
-    int count;              /* Number of currently slots filled */
-    s_x2node* tbl;  /* The data stored here */
-    s_x2node** ht;  /* Hash table for lookups */
-};
-
-/* There is only one instance of the array, which is the following */
-static s_x2* x2a;
-
 
 /* Allocate a new associative array */
 void Symbol_init(void) {
-    if (x2a) return;
-    x2a = new s_x2;
-    if (x2a) {
-        x2a->size = 128;
-        x2a->count = 0;
-        x2a->tbl = (x2node*)calloc(128, sizeof(x2node) + sizeof(x2node*));
-        if (x2a->tbl == nullptr) {
-            delete x2a;
-            x2a = nullptr;
-        }
-        else {
-            int i;
-            x2a->ht = (x2node**)&(x2a->tbl[128]);
-            for (i = 0; i < 128; i++) x2a->ht[i] = 0;
-        }
-    }
-}
-/* Insert a new record into the array.  Return TRUE if successful.
-** Prior data with the same key is NOT overwritten */
-int Symbol_insert(symbol* data, const char* key)
-{
-    x2node* np;
-    unsigned h;
-    unsigned ph;
-
-    if (x2a == nullptr) return 0;
-    ph = strhash(key);
-    h = ph & (x2a->size - 1);
-    np = x2a->ht[h];
-    while (np) {
-        if (strcmp(np->key, key) == 0) {
-            /* An existing entry with the same key is found. */
-            /* Fail because overwrite is not allows. */
-            return 0;
-        }
-        np = np->next;
-    }
-    if (x2a->count >= x2a->size) {
-        /* Need to make the hash table bigger */
-        int i, arrSize;
-        s_x2 array;
-        array.size = arrSize = x2a->size * 2;
-        array.count = x2a->count;
-        array.tbl = (x2node*)calloc(arrSize, sizeof(x2node) + sizeof(x2node*));
-        if (array.tbl == nullptr) return 0;  /* Fail due to malloc failure */
-        array.ht = (x2node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
-        for (i = 0; i < x2a->count; i++) {
-            x2node* oldnp, * newnp;
-            oldnp = &(x2a->tbl[i]);
-            h = strhash(oldnp->key) & (arrSize - 1);
-            newnp = &(array.tbl[i]);
-            if (array.ht[h]) array.ht[h]->from = &(newnp->next);
-            newnp->next = array.ht[h];
-            newnp->key = oldnp->key;
-            newnp->data = oldnp->data;
-            newnp->from = &(array.ht[h]);
-            array.ht[h] = newnp;
-        }
-        free(x2a->tbl);
-        *x2a = array;
-    }
-    /* Insert the new data */
-    h = ph & (x2a->size - 1);
-    np = &(x2a->tbl[x2a->count++]);
-    np->key = key;
-    np->data = data;
-    if (x2a->ht[h]) x2a->ht[h]->from = &(np->next);
-    np->next = x2a->ht[h];
-    x2a->ht[h] = np;
-    np->from = &(x2a->ht[h]);
-    return 1;
+    x2a_map.clear();
 }
 
 /* Return a pointer to data assigned to the given key.  Return NULL
 ** if no such key. */
-symbol* Symbol_find(const char* key)
+symbol* Symbol_find(std::string_view key)
 {
-    unsigned h;
-    x2node* np;
-
-    if (x2a == nullptr) return 0;
-    h = strhash(key) & (x2a->size - 1);
-    np = x2a->ht[h];
-    while (np) {
-        if (strcmp(np->key, key) == 0) break;
-        np = np->next;
-    }
-    return np ? np->data : nullptr;
-}
-
-/* Return the n-th data.  Return NULL if n is out of range. */
-symbol* Symbol_Nth(int n)
-{
-    symbol* data;
-    if (x2a && n > 0 && n <= x2a->count) {
-        data = x2a->tbl[n - 1].data;
-    }
-    else {
-        data = nullptr;
-    }
-    return data;
+    auto res = x2a_map.find(key);
+    return (res != x2a_map.end()) ? &res->second : nullptr;
 }
 
 /* Return the size of the array */
 int Symbol_count()
 {
-    return x2a ? x2a->count : 0;
+    return x2a_map.size();
 }
 
 /* Return an array of pointers to all data in the table.
 ** The array is obtained from malloc.  Return NULL if memory allocation
 ** problems, or if the array is empty. */
-symbol** Symbol_arrayof()
+std::vector<symbol*> Symbol_arrayof()
 {
-    symbol** array;
-    int i, arrSize;
-    if (x2a == nullptr) return 0;
-    arrSize = x2a->count;
-    array = (symbol**)calloc(arrSize, sizeof(symbol*));
-    if (array) {
-        for (i = 0; i < arrSize; i++) array[i] = x2a->tbl[i].data;
-    }
-    return array;
+    std::vector<symbol*> vs;
+    vs.reserve(x2a_map.size());
+
+    std::transform(x2a_map.begin(), x2a_map.end(), std::back_inserter(vs), [](auto& e)
+        {
+            return &e.second;
+        });
+
+    return vs;
 }
 
 }
@@ -5738,7 +5640,7 @@ state** State_arrayof(void)
 {
     state** array;
     int i, arrSize;
-    if (x3a == nullptr) return 0;
+    if (x3a == nullptr) return nullptr;
     arrSize = x3a->count;
     array = (state**)calloc(arrSize, sizeof(state*));
     if (array) {

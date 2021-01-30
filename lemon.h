@@ -1,5 +1,7 @@
 #pragma once
 
+#define _CRT_SECURE_NO_DEPRECATE
+
 enum class Boolean
 {
     LEMON_FALSE = 0,
@@ -73,11 +75,11 @@ enum class e_assoc {
 struct symbol {
     const char* name;        /* Name of the symbol */
     int index;               /* Index number for this symbol */
-    symbol_type type;   /* Symbols are all either TERMINALS or NTs */
-    rule* rule;       /* Linked list of rules of this (if an NT) */
-    symbol* fallback; /* fallback token in case this token doesn't parse */
+    symbol_type type;        /* Symbols are all either TERMINALS or NTs */
+    rule* rule;              /* Linked list of rules of this (if an NT) */
+    symbol* fallback;        /* fallback token in case this token doesn't parse */
     int prec;                /* Precedence if defined (-1 otherwise) */
-    e_assoc assoc;      /* Associativity if precedence is defined */
+    e_assoc assoc;           /* Associativity if precedence is defined */
     char* firstset;          /* First-set for all rules of this symbol */
     Boolean lambda;          /* True if NT and can generate an empty string */
     int useCnt;              /* Number of times used */
@@ -94,7 +96,7 @@ struct symbol {
                              ** it is ever more than just syntax */
                              /* The following fields are used by MULTITERMINALs only */
     int nsubsym;             /* Number of constituent symbols in the MULTI */
-    symbol** subsym;  /* Array of constituent symbols */
+    symbol** subsym;         /* Array of constituent symbols */
 };
 }
 using namespace Symbol;
@@ -104,18 +106,18 @@ namespace Rule
 /* Each production rule in the grammar is stored in the following
 ** structure.  */
 struct rule {
-    symbol* lhs;      /* Left-hand side of the rule */
+    symbol* lhs;             /* Left-hand side of the rule */
     const char* lhsalias;    /* Alias for the LHS (NULL if none) */
     int lhsStart;            /* True if left-hand side is the start symbol */
     int ruleline;            /* Line number for the rule */
     int nrhs;                /* Number of RHS symbols */
-    symbol** rhs;     /* The RHS symbols */
+    symbol** rhs;            /* The RHS symbols */
     const char** rhsalias;   /* An alias for each RHS symbol (NULL if none) */
     int line;                /* Line number at which code begins */
     const char* code;        /* The code executed when this rule is reduced */
     const char* codePrefix;  /* Setup code before code[] above */
     const char* codeSuffix;  /* Breakdown code after code[] above */
-    symbol* precsym;  /* Precedence symbol for this rule */
+    symbol* precsym;         /* Precedence symbol for this rule */
     int index;               /* An index number for this rule */
     int iRule;               /* Rule number as used in the generated tables */
     Boolean noCode;          /* True if this rule has no associated C code */
@@ -124,8 +126,8 @@ struct rule {
     Boolean doesReduce;      /* Reduce actions occur after optimization */
     Boolean neverReduce;     /* Reduce is theoretically possible, but prevented
                              ** by actions or other outside implementation */
-    rule* nextlhs;    /* Next rule with the same LHS */
-    rule* next;       /* Next rule in the global list */
+    rule* nextlhs;           /* Next rule with the same LHS */
+    rule* next;              /* Next rule in the global list */
 };
 }
 using namespace Rule;
@@ -230,71 +232,73 @@ struct plink {
 }
 using namespace Plink;
 
+#include <vector>
+
 /* The state vector for the entire parser generator is recorded as
 ** follows.  (LEMON uses no global variables and makes little use of
 ** static variables.  Fields in the following structure can be thought
 ** of as begin global variables in the program.) */
 struct lemon {
-    state** sorted;   /* Table of states sorted by state number */
-    Rule::rule* rule;       /* List of all rules */
-    Rule::rule* startRule;  /* First rule */
-    int nstate;              /* Number of states */
-    int nxstate;             /* nstate with tail degenerate states removed */
-    int nrule;               /* Number of rules */
-    int nruleWithAction;     /* Number of rules with actions */
-    int nsymbol;             /* Number of terminal and nonterminal symbols */
-    int nterminal;           /* Number of terminal symbols */
-    int minShiftReduce;      /* Minimum shift-reduce action value */
-    int errAction;           /* Error action value */
-    int accAction;           /* Accept action value */
-    int noAction;            /* No-op action value */
-    int minReduce;           /* Minimum reduce action */
-    int maxAction;           /* Maximum action value of any kind */
-    symbol** symbols; /* Sorted array of pointers to symbols */
-    int errorcnt;            /* Number of errors */
-    symbol* errsym;   /* The error symbol */
-    symbol* wildcard; /* Token that matches anything */
-    char* name;              /* Name of the generated parser */
-    char* arg;               /* Declaration of the 3rd argument to parser */
-    char* ctx;               /* Declaration of 2nd argument to constructor */
-    char* tokentype;         /* Type of terminal symbols in the parser stack */
-    char* vartype;           /* The default type of non-terminal symbols */
-    char* start;             /* Name of the start symbol for the grammar */
-    char* stacksize;         /* Size of the parser stack */
-    char* include;           /* Code to put at the start of the C file */
-    char* error;             /* Code to execute when an error is seen */
-    char* overflow;          /* Code to execute on a stack overflow */
-    char* failure;           /* Code to execute on parser failure */
-    char* accept;            /* Code to execute when the parser excepts */
-    char* extracode;         /* Code appended to the generated file */
-    char* tokendest;         /* Code to execute to destroy token data */
-    char* vardest;           /* Code for the default non-terminal destructor */
-    char* filename;          /* Name of the input file */
-    char* outname;           /* Name of the current output file */
-    char* tokenprefix;       /* A prefix added to token names in the .h file */
-    int nconflict;           /* Number of parsing conflicts */
-    int nactiontab;          /* Number of entries in the yy_action[] table */
-    int nlookaheadtab;       /* Number of entries in yy_lookahead[] */
-    int tablesize;           /* Total table size of all tables in bytes */
-    int basisflag;           /* Print only basis configurations */
-    int printPreprocessed;   /* Show preprocessor output on stdout */
-    int has_fallback;        /* True if any %fallback is seen in the grammar */
-    int nolinenosflag;       /* True if #line statements should not be printed */
-    char* argv0;             /* Name of the program */
+    state** sorted                = nullptr;      /* Table of states sorted by state number */
+    Rule::rule* rule              = nullptr;      /* List of all rules */
+    Rule::rule* startRule         = nullptr;      /* First rule */
+    int nstate                    = 0;            /* Number of states */
+    int nxstate                   = 0;            /* nstate with tail degenerate states removed */
+    int nrule                     = 0;            /* Number of rules */
+    int nruleWithAction           = 0;            /* Number of rules with actions */
+    int nsymbol                   = 0;            /* Number of terminal and nonterminal symbols */
+    int nterminal                 = 0;            /* Number of terminal symbols */
+    int minShiftReduce            = 0;            /* Minimum shift-reduce action value */
+    int errAction                 = 0;            /* Error action value */
+    int accAction                 = 0;            /* Accept action value */
+    int noAction                  = 0;            /* No-op action value */
+    int minReduce                 = 0;            /* Minimum reduce action */
+    int maxAction                 = 0;            /* Maximum action value of any kind */
+    std::vector<symbol*> symbols;                 /* Sorted array of pointers to symbols */
+    int errorcnt                  = 0;            /* Number of errors */
+    symbol* errsym                = 0;            /* The error symbol */
+    symbol* wildcard              = nullptr;      /* Token that matches anything */
+    char* name                    = nullptr;      /* Name of the generated parser */
+    char* arg                     = nullptr;      /* Declaration of the 3rd argument to parser */
+    char* ctx                     = nullptr;      /* Declaration of 2nd argument to constructor */
+    char* tokentype               = nullptr;      /* Type of terminal symbols in the parser stack */
+    char* vartype                 = nullptr;      /* The default type of non-terminal symbols */
+    char* start                   = nullptr;      /* Name of the start symbol for the grammar */
+    char* stacksize               = nullptr;      /* Size of the parser stack */
+    char* include                 = nullptr;      /* Code to put at the start of the C file */
+    char* error                   = nullptr;      /* Code to execute when an error is seen */
+    char* overflow                = nullptr;      /* Code to execute on a stack overflow */
+    char* failure                 = nullptr;      /* Code to execute on parser failure */
+    char* accept                  = nullptr;      /* Code to execute when the parser excepts */
+    char* extracode               = nullptr;      /* Code appended to the generated file */
+    char* tokendest               = nullptr;      /* Code to execute to destroy token data */
+    char* vardest                 = nullptr;      /* Code for the default non-terminal destructor */
+    char* filename                = nullptr;      /* Name of the input file */
+    char* outname                 = nullptr;      /* Name of the current output file */
+    char* tokenprefix             = nullptr;      /* A prefix added to token names in the .h file */
+    int nconflict                 = 0;            /* Number of parsing conflicts */
+    int nactiontab                = 0;            /* Number of entries in the yy_action[] table */
+    int nlookaheadtab             = 0;            /* Number of entries in yy_lookahead[] */
+    int tablesize                 = 0;            /* Total table size of all tables in bytes */
+    int basisflag                 = 0;            /* Print only basis configurations */
+    int printPreprocessed         = 0;            /* Show preprocessor output on stdout */
+    int has_fallback              = 0;            /* True if any %fallback is seen in the grammar */
+    int nolinenosflag             = 0;            /* True if #line statements should not be printed */
+    char* argv0                   = nullptr;      /* Name of the program */
 };
+
+#include <string_view>
 
 namespace Symbol
 {
 /* Routines for handling symbols of the grammar */
 
 symbol* Symbol_new(const char*);
-int Symbolcmpp(const void*, const void*);
+bool Symbolcmpp(const symbol*, const symbol*);
 void Symbol_init(void);
-int Symbol_insert(symbol*, const char*);
-symbol* Symbol_find(const char*);
-symbol* Symbol_Nth(int);
+symbol* Symbol_find(std::string_view);
 int Symbol_count(void);
-symbol** Symbol_arrayof(void);
+std::vector<symbol*> Symbol_arrayof();
 }
 using namespace Symbol;
 

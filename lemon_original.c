@@ -6,6 +6,7 @@
 **
 ** The author of this program disclaims copyright.
 */
+#define _CRT_SECURE_NO_DEPRECATE
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
