@@ -1518,11 +1518,14 @@ int main(int argc, char** argv) {
     Symbol_new("{default}");
     lem.nsymbol = Symbol_count();
     lem.symbols = Symbol_arrayof();
-    std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
-        sp->index = i++;
-    });
+
+    //we apply index counting as we add instead of here
+    //std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
+    //    sp->index = i++;
+    //});
 
     std::sort(lem.symbols.begin(), lem.symbols.end(), &Symbolcmpp);
+
 
     std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
         sp->index = i++;
@@ -1531,14 +1534,14 @@ int main(int argc, char** argv) {
     auto first_non_multiterminal = std::find_if(lem.symbols.rbegin(), lem.symbols.rend(), [](const auto& sp) {
         return sp->type == symbol_type::MULTITERMINAL;
         });
-    lem.nsymbol = std::distance(lem.symbols.rbegin(), first_non_multiterminal);
+    lem.nsymbol = std::distance(first_non_multiterminal, lem.symbols.rend());
 
     assert(strcmp(lem.symbols[i]->name, "{default}") == 0);
 
     auto last_terminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
         return !ISUPPER(sp->name[0]);
         });
-    lem.nterminal = std::distance(lem.symbols.begin(), last_terminal) - 1;
+    lem.nterminal = std::distance(lem.symbols.begin(), last_terminal);
 
     /* Assign sequential rule numbers.  Start with 0.  Put rules that have no
     ** reduce action C-code associated with them last, so that the switch()
@@ -5219,7 +5222,7 @@ static std::unordered_set<std::string> x1a_set;
 */
 const char* Strsafe(std::string_view y)
 {
-    if (y == nullptr) return nullptr;
+    if (y.empty()) return nullptr;
     auto [z, inserted] = x1a_set.emplace(y);
     if (z == x1a_set.end())
     {
@@ -5251,7 +5254,7 @@ symbol* Symbol_new(const char* x)
         symbol s;
 
         s.name = Strsafe(x);
-        s.index = 0;
+        s.index = x2a_map.size()+1; //index in the order as found
         s.type = ISUPPER(*x) ? symbol_type::TERMINAL : symbol_type::NONTERMINAL;
         s.rule = nullptr;
         s.fallback = nullptr;

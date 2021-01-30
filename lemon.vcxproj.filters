@@ -13,15 +13,21 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Supplemental Files">
+      <UniqueIdentifier>{0929206d-0ea5-4d78-af9b-509f1642cf55}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="lemon.cpp">
+    <ClCompile Include="..\lemon_cpp\lemon_original.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lemon.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <None Include="..\lemon_cpp\sqlite_parse.y">
+      <Filter>Supplemental Files</Filter>
+    </None>
+    <None Include="..\lemon_cpp\lempar.c">
+      <Filter>Supplemental Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
