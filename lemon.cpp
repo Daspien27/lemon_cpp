@@ -51,7 +51,7 @@ extern "C" {
 #include <string>
 #include <string_view>
 #include <vector>
-
+#include <unordered_set>
 
 /* #define PRIVATE static */
 #define PRIVATE
@@ -253,10 +253,10 @@ int SetUnion(char*, const char*);    /* A <- A U B, thru element N */
 ** Code for processing tables in the LEMON parser generator.
 */
 /* Routines for handling a strings */
-const char* Strsafe(const char*);
+const char* Strsafe(std::string_view);
 void Strsafe_init(void);
-int Strsafe_insert(const char*);
-const char* Strsafe_find(const char*);
+bool Strsafe_insert(std::string_view);
+std::string_view Strsafe_find(std::string_view);
 
 namespace Action
 {
@@ -5211,148 +5211,28 @@ int SetUnion(char* s1, const char* s2)
 ** Code for processing tables in the LEMON parser generator.
 */
 
-PRIVATE unsigned strhash(const char* x)
-{
-    unsigned h = 0;
-    while (*x) h = h * 13 + *(x++);
-    return h;
-}
+static std::unordered_set<std::string> x1a_set;
 
 /* Works like strdup, sort of.  Save a string in malloced memory, but
 ** keep strings in a table so that the same string is not in more
 ** than one place.
 */
-const char* Strsafe(const char* y)
+const char* Strsafe(std::string_view y)
 {
-    const char* z;
-    char* cpy;
-
-    if (y == nullptr) return 0;
-    z = Strsafe_find(y);
-    if (z == nullptr && (cpy = new char [lemonStrlen(y) + 1]) != 0) {
-        lemon_strcpy(cpy, y);
-        z = cpy;
-        Strsafe_insert(z);
+    if (y == nullptr) return nullptr;
+    auto [z, inserted] = x1a_set.emplace(y);
+    if (z == x1a_set.end())
+    {
+        memory_error();
     }
-    MemoryCheck(z);
-    return z;
+
+    return z->data();
 }
-
-/* There is one instance of this structure for every data element
-** in an associative array of type "x1".
-*/
-struct s_x1node {
-    const char* data;        /* The data */
-    s_x1node* next;   /* Next entry with the same hash */
-    s_x1node** from;  /* Previous link */
-};
-
-using x1node = s_x1node;
-
-/* There is one instance of the following structure for each
-** associative array of type "x1".
-*/
-struct s_x1 {
-    int size;               /* The number of available slots. */
-                            /*   Must be a power of 2 greater than or */
-                            /*   equal to 1 */
-    int count;              /* Number of currently slots filled */
-    s_x1node* tbl;  /* The data stored here */
-    s_x1node** ht;  /* Hash table for lookups */
-};
-
-/* There is only one instance of the array, which is the following */
-static s_x1* x1a;
 
 /* Allocate a new associative array */
 void Strsafe_init(void) {
-    if (x1a) return;
-    x1a = new s_x1;
-    if (x1a) {
-        x1a->size = 1024;
-        x1a->count = 0;
-        x1a->tbl = (x1node*)calloc(1024, sizeof(x1node) + sizeof(x1node*));
-        if (x1a->tbl == nullptr) {
-            delete x1a;
-            x1a = nullptr;
-        }
-        else {
-            int i;
-            x1a->ht = (x1node**)&(x1a->tbl[1024]);
-            for (i = 0; i < 1024; i++) x1a->ht[i] = 0;
-        }
-    }
-}
-/* Insert a new record into the array.  Return TRUE if successful.
-** Prior data with the same key is NOT overwritten */
-int Strsafe_insert(const char* data)
-{
-    x1node* np;
-    unsigned h;
-    unsigned ph;
-
-    if (x1a == nullptr) return 0;
-    ph = strhash(data);
-    h = ph & (x1a->size - 1);
-    np = x1a->ht[h];
-    while (np) {
-        if (strcmp(np->data, data) == 0) {
-            /* An existing entry with the same key is found. */
-            /* Fail because overwrite is not allows. */
-            return 0;
-        }
-        np = np->next;
-    }
-    if (x1a->count >= x1a->size) {
-        /* Need to make the hash table bigger */
-        int i, arrSize;
-        s_x1 array;
-        array.size = arrSize = x1a->size * 2;
-        array.count = x1a->count;
-        array.tbl = (x1node*)calloc(arrSize, sizeof(x1node) + sizeof(x1node*));
-        if (array.tbl == nullptr) return 0;  /* Fail due to malloc failure */
-        array.ht = (x1node**)&(array.tbl[arrSize]);
-        for (i = 0; i < arrSize; i++) array.ht[i] = nullptr;
-        for (i = 0; i < x1a->count; i++) {
-            x1node* oldnp, * newnp;
-            oldnp = &(x1a->tbl[i]);
-            h = strhash(oldnp->data) & (arrSize - 1);
-            newnp = &(array.tbl[i]);
-            if (array.ht[h]) array.ht[h]->from = &(newnp->next);
-            newnp->next = array.ht[h];
-            newnp->data = oldnp->data;
-            newnp->from = &(array.ht[h]);
-            array.ht[h] = newnp;
-        }
-        free(x1a->tbl);
-        *x1a = array;
-    }
-    /* Insert the new data */
-    h = ph & (x1a->size - 1);
-    np = &(x1a->tbl[x1a->count++]);
-    np->data = data;
-    if (x1a->ht[h]) x1a->ht[h]->from = &(np->next);
-    np->next = x1a->ht[h];
-    x1a->ht[h] = np;
-    np->from = &(x1a->ht[h]);
-    return 1;
-}
-
-/* Return a pointer to data assigned to the given key.  Return NULL
-** if no such key. */
-const char* Strsafe_find(const char* key)
-{
-    unsigned h;
-    x1node* np;
-
-    if (x1a == nullptr) return 0;
-    h = strhash(key) & (x1a->size - 1);
-    np = x1a->ht[h];
-    while (np) {
-        if (strcmp(np->data, key) == 0) break;
-        np = np->next;
-    }
-    return np ? np->data : nullptr;
+    x1a_set.clear();
+    x1a_set.reserve(1024);
 }
 
 namespace Symbol
