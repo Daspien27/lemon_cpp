@@ -52,6 +52,7 @@ extern "C" {
 #include <string_view>
 #include <vector>
 #include <unordered_set>
+#include <iterator>
 
 /* #define PRIVATE static */
 #define PRIVATE
@@ -1539,21 +1540,15 @@ int main(int argc, char** argv) {
     symbol nt;
     nt.type = symbol_type::NONTERMINAL;
 
-    auto nonterminal_range = std::equal_range(lem.symbols.begin(), lem.symbols.end(), &nt, [](const auto& x, const auto& y) {
+    auto [begin_nonterminal, end_nonterminal] = std::equal_range(lem.symbols.begin(), lem.symbols.end(), &nt, [](const auto& x, const auto& y) {
         return static_cast<int> (x->type) < static_cast<int> (y->type);
         });
 
-    auto first_non_multiterminal = std::find_if(lem.symbols.rbegin(), lem.symbols.rend(), [](const auto& sp) {
-        return sp->type != symbol_type::MULTITERMINAL;
-        });
-    lem.nsymbol = std::distance(lem.symbols.begin(), nonterminal_range.second) - 1;
+    lem.nsymbol = std::distance(lem.symbols.begin(), end_nonterminal) - 1;
 
     assert(strcmp(lem.symbols[lem.nsymbol]->name, "{default}") == 0);
 
-    auto first_nonterminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
-        return !ISUPPER(sp->name[0]);
-        });
-    lem.nterminal = std::distance(lem.symbols.begin(), nonterminal_range.first);
+    lem.nterminal = std::distance(lem.symbols.begin(), begin_nonterminal);
 
     /* Assign sequential rule numbers.  Start with 0.  Put rules that have no
     ** reduce action C-code associated with them last, so that the switch()
