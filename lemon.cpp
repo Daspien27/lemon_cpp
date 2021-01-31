@@ -1531,17 +1531,29 @@ int main(int argc, char** argv) {
         sp->index = i++;
     });
 
+    //List: T T T T T ... T T T NT NT NT ... NT NT{{default}} MT MT MT 
+    //                                                 ^ first_non_multiterminal
+    //                          ^ first_nonterminal
+    //Goal: Binary Search ->
+
+    symbol nt;
+    nt.type = symbol_type::NONTERMINAL;
+
+    auto nonterminal_range = std::equal_range(lem.symbols.begin(), lem.symbols.end(), &nt, [](const auto& x, const auto& y) {
+        return static_cast<int> (x->type) < static_cast<int> (y->type);
+        });
+
     auto first_non_multiterminal = std::find_if(lem.symbols.rbegin(), lem.symbols.rend(), [](const auto& sp) {
         return sp->type != symbol_type::MULTITERMINAL;
         });
-    lem.nsymbol = std::distance(first_non_multiterminal, lem.symbols.rend()) - 1;
+    lem.nsymbol = std::distance(lem.symbols.begin(), nonterminal_range.second) - 1;
 
     assert(strcmp(lem.symbols[lem.nsymbol]->name, "{default}") == 0);
 
-    auto last_terminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
+    auto first_nonterminal = std::find_if(std::next(lem.symbols.begin()), lem.symbols.end(), [](const auto& sp) {
         return !ISUPPER(sp->name[0]);
         });
-    lem.nterminal = std::distance(lem.symbols.begin(), last_terminal);
+    lem.nterminal = std::distance(lem.symbols.begin(), nonterminal_range.first);
 
     /* Assign sequential rule numbers.  Start with 0.  Put rules that have no
     ** reduce action C-code associated with them last, so that the switch()
