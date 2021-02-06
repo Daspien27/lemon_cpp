@@ -47,6 +47,12 @@ extern "C" {
 
 //C++ Headers
 #include <algorithm>
+#include <numeric>
+#include <functional>
+
+#include <iostream>
+#include <iomanip>
+
 #include <map>
 #include <string>
 #include <string_view>
@@ -202,11 +208,11 @@ struct s_options {
     char* arg;
     const char* message;
 };
-int    OptInit(char*&, s_options*, FILE*);
-int    OptNArgs(void);
+int    OptInit(char*&);
+int    OptNArgs();
 char* OptArg(int);
 void   OptErr(int);
-void   OptPrint(void);
+void   OptPrint();
 
 /******** From the file "parse.h" *****************************************/
 void Parse(lemon& lemp);
@@ -223,7 +229,7 @@ void ResortStates(lemon&);
 
 /********** From the file "set.h" ****************************************/
 void  SetSize(int);             /* All sets will be of size N */
-char* SetNew(void);               /* A new set for element 0..N */
+char* SetNew();               /* A new set for element 0..N */
 void  SetFree(char*);             /* Deallocate a set */
 int SetAdd(char*, int);            /* Add element to a set */
 int SetUnion(char*, const char*);    /* A <- A U B, thru element N */
@@ -1438,6 +1444,11 @@ static void stats_line(const char* zLabel, int iValue) {
         iValue);
 }
 
+static char** g_argv;
+static std::vector<s_options> op;
+static FILE* errstream;
+
+
 /* The main program.  Parse the command line and do it... */
 int main(int argc, char** argv) {
     static int version = 0;
@@ -1452,7 +1463,7 @@ int main(int argc, char** argv) {
     static int sqlFlag = 0;
     static int printPP = 0;
 
-    static s_options options[] = {
+    op = {
       {OPT_FLAG, "b", (char*)&basisflag, "Print only the basis in report."},
       {OPT_FLAG, "c", (char*)&compress, "Don't compress the action table."},
       {OPT_FSTR, "d", (char*)&handle_d_option, "Output directory.  Default '.'"},
@@ -1474,8 +1485,7 @@ int main(int argc, char** argv) {
                       "Generate the *.sql file describing the parser tables."},
       {OPT_FLAG, "x", (char*)&version, "Print the version number."},
       {OPT_FSTR, "T", (char*)handle_T_option, "Specify a template file."},
-      {OPT_FSTR, "W", 0, "Ignored.  (Placeholder for '-W' compiler options.)"},
-      {OPT_FLAG,0,0,0}
+      {OPT_FSTR, "W", 0, "Ignored.  (Placeholder for '-W' compiler options.)"}
     };
     int i;
     int exitcode;
@@ -1483,7 +1493,7 @@ int main(int argc, char** argv) {
     rule* rp;
 
     (void)argc;
-    OptInit(*argv, options, stderr);
+    OptInit(*argv);
     if (version) {
         printf("Lemon version 1.0\n");
         exit(0);
@@ -1516,17 +1526,11 @@ int main(int argc, char** argv) {
     lem.errsym = Symbol_find("error");
 
     /* Count and index the symbols of the grammar */
-    Symbol_new("{default}");
+    auto default_nonterminal = Symbol_new("{default}");
     lem.nsymbol = Symbol_count();
     lem.symbols = Symbol_arrayof();
 
-    //we apply index counting as we add instead of here
-    //std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
-    //    sp->index = i++;
-    //});
-
     std::sort(lem.symbols.begin(), lem.symbols.end(), &Symbolcmpp);
-
 
     std::for_each(lem.symbols.begin(), lem.symbols.end(), [i = 0](auto& sp) mutable {
         sp->index = i++;
@@ -1537,10 +1541,7 @@ int main(int argc, char** argv) {
     //                          ^ first_nonterminal
     //Goal: Binary Search ->
 
-    symbol nt;
-    nt.type = symbol_type::NONTERMINAL;
-
-    auto [begin_nonterminal, end_nonterminal] = std::equal_range(lem.symbols.begin(), lem.symbols.end(), &nt, [](const auto& x, const auto& y) {
+    auto [begin_nonterminal, end_nonterminal] = std::equal_range(lem.symbols.begin(), lem.symbols.end(), default_nonterminal, [](const auto& x, const auto& y) {
         return static_cast<int> (x->type) < static_cast<int> (y->type);
         });
 
@@ -1760,9 +1761,7 @@ static char* msort(
     return ep;
 }
 /************************ From the file "option.c" **************************/
-static char** g_argv;
-static s_options* op;
-static FILE* errstream;
+
 
 #define ISOPT(X) ((X)[0]=='-'||(X)[0]=='+'||strchr((X),'=')!=0)
 
@@ -1770,22 +1769,28 @@ static FILE* errstream;
 ** Print the command line with a carrot pointing to the k-th character
 ** of the n-th field.
 */
-static void errline(int n, int k, FILE* err)
+static void errline(int n, int k)
 {
     int spcnt, i;
-    if (g_argv[0]) fprintf(err, "%s", g_argv[0]);
+    if (g_argv[0])
+    {
+        std::cerr << g_argv[0];
+    }
     spcnt = lemonStrlen(g_argv[0]) + 1;
     for (i = 1; i < n && g_argv[i]; i++) {
-        fprintf(err, " %s", g_argv[i]);
+        std::cerr << " " << g_argv[i];
         spcnt += lemonStrlen(g_argv[i]) + 1;
     }
     spcnt += k;
-    for (; g_argv[i]; i++) fprintf(err, " %s", g_argv[i]);
+    for (; g_argv[i]; i++)
+    {
+        std::cerr << " " << g_argv[i];
+    }
     if (spcnt < 20) {
-        fprintf(err, "\n%*s^-- here\n", spcnt, "");
+        std::cerr << "\n" << std::setw(spcnt) << "" << "^-- here\n";
     }
     else {
-        fprintf(err, "\n%*shere --^\n", spcnt - 7, "");
+        std::cerr << "\n" << std::setw(spcnt - 7) << "" << "here --^\n";
     }
 }
 
@@ -1814,20 +1819,18 @@ static char emsg[] = "Command line syntax error: ";
 /*
 ** Process a flag command line argument.
 */
-static int handleflags(int i, FILE* err)
+static int handleflags(int i)
 {
     int v;
     int errcnt = 0;
     int j;
-    for (j = 0; op[j].label; j++) {
+    for (j = 0; j < op.size(); j++) {
         if (strncmp(&g_argv[i][1], op[j].label, lemonStrlen(op[j].label)) == 0) break;
     }
     v = g_argv[i][0] == '-' ? 1 : 0;
     if (op[j].label == nullptr) {
-        if (err) {
-            fprintf(err, "%sundefined option.\n", emsg);
-            errline(i, 1, err);
-        }
+        std::cerr << emsg << "undefined option.\n";
+        errline(i, 1);
         errcnt++;
     }
     else if (op[j].arg == nullptr) {
@@ -1843,10 +1846,9 @@ static int handleflags(int i, FILE* err)
         (*(void(*)(char*))(op[j].arg))(&g_argv[i][2]);
     }
     else {
-        if (err) {
-            fprintf(err, "%smissing argument on switch.\n", emsg);
-            errline(i, 1, err);
-        }
+        std::cerr << emsg << "missing argument on switch.\n";
+        errline(i, 1);
+
         errcnt++;
     }
     return errcnt;
@@ -1855,7 +1857,7 @@ static int handleflags(int i, FILE* err)
 /*
 ** Process a command line switch which has an argument.
 */
-static int handleswitch(int i, FILE* err)
+static int handleswitch(int i)
 {
     int lv = 0;
     double dv = 0.0;
@@ -1866,15 +1868,14 @@ static int handleswitch(int i, FILE* err)
     cp = strchr(g_argv[i], '=');
     assert(cp != nullptr);
     *cp = 0;
-    for (j = 0; op[j].label; j++) {
+    for (j = 0; j < op.size(); j++) {
         if (strcmp(g_argv[i], op[j].label) == 0) break;
     }
     *cp = '=';
     if (op[j].label == nullptr) {
-        if (err) {
-            fprintf(err, "%sundefined option.\n", emsg);
-            errline(i, 0, err);
-        }
+        std::cerr << emsg << "undefined option.\n";
+        errline(i, 0);
+
         errcnt++;
     }
     else {
@@ -1882,21 +1883,18 @@ static int handleswitch(int i, FILE* err)
         switch (op[j].type) {
         case OPT_FLAG:
         case OPT_FFLAG:
-            if (err) {
-                fprintf(err, "%soption requires an argument.\n", emsg);
-                errline(i, 0, err);
-            }
+            std::cerr << emsg << "option requires an argument.\n";
+            errline(i, 0);
+
             errcnt++;
             break;
         case OPT_DBL:
         case OPT_FDBL:
             dv = strtod(cp, &end);
             if (*end) {
-                if (err) {
-                    fprintf(err,
-                        "%sillegal character in floating-point argument.\n", emsg);
-                    errline(i, (int)((char*)end - (char*)g_argv[i]), err);
-                }
+                std::cerr << emsg << "illegal character in floating-point argument.\n";
+                errline(i, (int)((char*)end - (char*)g_argv[i]));
+
                 errcnt++;
             }
             break;
@@ -1904,10 +1902,9 @@ static int handleswitch(int i, FILE* err)
         case OPT_FINT:
             lv = strtol(cp, &end, 0);
             if (*end) {
-                if (err) {
-                    fprintf(err, "%sillegal character in integer argument.\n", emsg);
-                    errline(i, (int)((char*)end - (char*)g_argv[i]), err);
-                }
+
+                    std::cerr << emsg << "illegal character in integer argument.\n";
+                    errline(i, (int)((char*)end - (char*)g_argv[i]));
                 errcnt++;
             }
             break;
@@ -1943,25 +1940,23 @@ static int handleswitch(int i, FILE* err)
     return errcnt;
 }
 
-int OptInit(char*& a, s_options* o, FILE* err)
+int OptInit(char*& a)
 {
     int errcnt = 0;
     g_argv = &a;
-    op = o;
-    errstream = err;
-    if (g_argv && *g_argv && op) {
+    if (g_argv && *g_argv) {
         int i;
         for (i = 1; g_argv[i]; i++) {
             if (g_argv[i][0] == '+' || g_argv[i][0] == '-') {
-                errcnt += handleflags(i, err);
+                errcnt += handleflags(i);
             }
             else if (strchr(g_argv[i], '=')) {
-                errcnt += handleswitch(i, err);
+                errcnt += handleswitch(i);
             }
         }
     }
     if (errcnt > 0) {
-        fprintf(err, "Valid command line options for \"%s\" are:\n", a);
+        std::cerr << "Valid command line options for \"" << a << "\" are:\n";
         OptPrint();
         exit(1);
     }
@@ -1992,57 +1987,37 @@ void OptErr(int n)
 {
     int i;
     i = argindex(n);
-    if (i >= 0) errline(i, 0, errstream);
+    if (i >= 0) errline(i, 0);
 }
 
-void OptPrint(void) {
-    int i;
-    int max, len;
-    max = 0;
-    for (i = 0; op[i].label; i++) {
-        len = lemonStrlen(op[i].label) + 1;
-        switch (op[i].type) {
+void OptPrint() {
+
+    auto type_name = [](auto type) {
+        switch (type) {
         case OPT_FLAG:
         case OPT_FFLAG:
-            break;
-        case OPT_INT:
-        case OPT_FINT:
-            len += 9;       /* length of "<integer>" */
-            break;
-        case OPT_DBL:
-        case OPT_FDBL:
-            len += 6;       /* length of "<real>" */
-            break;
+            return "";
+        //case OPT_INT:
+        //case OPT_FINT:
+        //    return "<integer>";
+        //case OPT_DBL:
+        //case OPT_FDBL:
+        //    return "<real>";
         case OPT_STR:
         case OPT_FSTR:
-            len += 8;       /* length of "<string>" */
-            break;
+            return "<string>";
         }
-        if (len > max) max = len;
-    }
-    for (i = 0; op[i].label; i++) {
-        switch (op[i].type) {
-        case OPT_FLAG:
-        case OPT_FFLAG:
-            fprintf(errstream, "  -%-*s  %s\n", max, op[i].label, op[i].message);
-            break;
-        case OPT_INT:
-        case OPT_FINT:
-            fprintf(errstream, "  -%s<integer>%*s  %s\n", op[i].label,
-                (int)(max - lemonStrlen(op[i].label) - 9), "", op[i].message);
-            break;
-        case OPT_DBL:
-        case OPT_FDBL:
-            fprintf(errstream, "  -%s<real>%*s  %s\n", op[i].label,
-                (int)(max - lemonStrlen(op[i].label) - 6), "", op[i].message);
-            break;
-        case OPT_STR:
-        case OPT_FSTR:
-            fprintf(errstream, "  -%s<string>%*s  %s\n", op[i].label,
-                (int)(max - lemonStrlen(op[i].label) - 8), "", op[i].message);
-            break;
-        }
-    }
+
+        return "";
+    };
+
+    size_t max = std::transform_reduce(op.begin(), op.end(), 0u, [](auto x, auto y) { return std::max(x, y); }, [&](const auto& e) {
+            return strlen(e.label) + strlen(type_name(e.type));
+        });
+
+    std::for_each(op.begin(), op.end(), [&](const auto& e) {
+        std::cerr << "  -" << e.label << std::setw(max - strlen(e.label)) << type_name(e.type) << "   " << e.message << "\n";
+    });
 }
 /*********************** From the file "parse.c" ****************************/
 /*
