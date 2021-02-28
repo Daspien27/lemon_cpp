@@ -76,7 +76,7 @@ struct symbol {
     const char* name;        /* Name of the symbol */
     int index;               /* Index number for this symbol */
     symbol_type type;        /* Symbols are all either TERMINALS or NTs */
-    rule* rule;              /* Linked list of rules of this (if an NT) */
+    struct rule* rule;       /* Linked list of rules of this (if an NT) */
     symbol* fallback;        /* fallback token in case this token doesn't parse */
     int prec;                /* Precedence if defined (-1 otherwise) */
     e_assoc assoc;           /* Associativity if precedence is defined */

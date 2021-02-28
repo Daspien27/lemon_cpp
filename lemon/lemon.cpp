@@ -2011,7 +2011,7 @@ void OptPrint() {
         return "";
     };
 
-    size_t max = std::transform_reduce(op.begin(), op.end(), 0u, [](auto x, auto y) { return std::max(x, y); }, [&](const auto& e) {
+    size_t max = std::transform_reduce(op.begin(), op.end(), 0u, [](auto x, auto y) { return std::max<std::uint32_t>(x, y); }, [&](const auto& e) {
             return strlen(e.label) + strlen(type_name(e.type));
         });
 
