@@ -33,17 +33,28 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
         EXCLUDE_FROM_ALL)
 
 # ----- Project specific config starts here -----
-add_executable(lemon_tests "")
-add_subdirectory(regression)
+# Locate relevant executables and set definitions
 get_property(LEMPAR_PATH GLOBAL PROPERTY LEMPAR_PATH)
 set(SQLITE_GRAMMAR_PATH ${CMAKE_CURRENT_SOURCE_DIR}/data/sqlite_parse.y)
-add_custom_target(
-        prepare_regression_tests
-        COMMAND rm -rf lemon_original_out lemon_cpp_out
-        COMMAND mkdir lemon_original_out && $<TARGET_FILE:lemon_cpp> -T"${LEMPAR_PATH}" -d"lemon_original_out" ${SQLITE_GRAMMAR_PATH}
-        COMMAND mkdir lemon_cpp_out && $<TARGET_FILE:lemon_original> -T"${LEMPAR_PATH}" -d"lemon_cpp_out" ${SQLITE_GRAMMAR_PATH}
-)
-add_dependencies(lemon_tests prepare_regression_tests)
+cmake_policy(PUSH)
+cmake_policy(SET CMP0026 OLD)
+get_property(LEMON_ORIGINAL_EXECUTABLE_PATH TARGET lemon_original PROPERTY LOCATION)
+get_property(LEMON_CPP_EXECUTABLE_PATH TARGET lemon_cpp PROPERTY LOCATION)
+cmake_policy(POP)
+set(LEMON_ORIGINAL_OUT_DIR ${CMAKE_BINARY_DIR}/generatedOriginalOut)
+set(LEMON_CPP_OUT_DIR ${CMAKE_BINARY_DIR}/generatedCppOut)
+file(MAKE_DIRECTORY ${LEMON_ORIGINAL_OUT_DIR})
+file(MAKE_DIRECTORY ${LEMON_CPP_OUT_DIR})
+add_definitions(-DLEMPAR_PATH="${LEMPAR_PATH}"
+                -DSQLITE_GRAMMAR_PATH="${SQLITE_GRAMMAR_PATH}"
+                -DLEMON_ORIGINAL_EXECUTABLE_PATH="${LEMON_ORIGINAL_EXECUTABLE_PATH}"
+                -DLEMON_CPP_EXECUTABLE_PATH="${LEMON_CPP_EXECUTABLE_PATH}"
+                -DLEMON_ORIGINAL_OUT_DIR="${LEMON_ORIGINAL_OUT_DIR}"
+                -DLEMON_CPP_OUT_DIR="${LEMON_CPP_OUT_DIR}")
+
+# Setup tests target
+add_executable(lemon_tests "")
+add_subdirectory(regression)
 target_link_libraries(lemon_tests gtest_main)
 gtest_discover_tests(lemon_tests)
 ENDIF(BUILD_TESTING)
