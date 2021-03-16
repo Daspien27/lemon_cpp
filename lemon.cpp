@@ -1448,9 +1448,240 @@ static char** g_argv;
 static std::vector<s_options> op;
 static FILE* errstream;
 
+#include <functional>
+
+
+using namespace std::string_view_literals;
+namespace options {
+
+    template <typename OptionType>
+    void parse(std::string_view arg, OptionType& op);
+
+    template <>
+    void parse<std::string>(std::string_view arg, std::string& op) {
+        op = arg;
+    }
+
+
+    template <typename OptionType>
+    struct argument_traits;
+
+    template <>
+    struct argument_traits<std::string> {
+        static constexpr std::string_view name = "string"sv;
+    };
+
+    template <typename OptionType>
+    static constexpr std::string_view argument_name = argument_traits<OptionType>::name;
+
+    template <typename OptionType>
+    concept ImplementedOptionType = requires(OptionType a) {
+        argument_name<OptionType>;
+        parse<OptionType>(""sv, a);
+    };
+
+
+    struct command {
+        char short_key;
+        std::string_view long_key; // const char* == std::string_view as char* === std::string
+        std::string_view doc;
+
+    };
+
+    struct command_callback
+    {
+        command c;
+        std::function<void(std::string_view)> callback;
+    };
+
+    struct ParserBuilder {
+        std::vector<command_callback> op;
+        std::vector<std::function<void(std::string_view)>> positionals;
+    };
+
+    template <ImplementedOptionType ParameterType>
+    struct parameter
+    {
+        ParameterType p;
+
+    public:
+        parameter(ParserBuilder& builder, command c) {
+            builder.op.emplace_back(c, [&](std::string_view arg) {
+                    parse(arg, p);
+                });
+        }
+
+        [[nodiscard]] constexpr const auto& operator()() const
+        {
+            return p;
+        }
+    };
+
+    template <ImplementedOptionType ArgumentType>
+    struct argument {
+        ArgumentType a;
+
+    public:
+        argument(ParserBuilder& builder) {
+            builder.positionals.emplace_back([&](std::string_view arg) {
+                    parse(arg, a);
+                });
+        }
+
+        [[nodiscard]] constexpr const auto& operator()() const
+        {
+            return a;
+        }
+    };
+    
+    struct flag {
+        
+        bool f = false;
+        
+    public:
+        flag(ParserBuilder& builder, command c) {
+            builder.op.emplace_back(c, [&](std::string_view arg) {
+                    f = true;
+                });
+        }
+
+        [[nodiscard]] constexpr bool operator()() const
+        {
+            return f;
+        }
+    };
+
+
+    class Parameters {
+
+    private:
+
+        ParserBuilder builder_;
+
+        static constexpr command help = { .short_key = '?', .long_key = "help"sv, .doc = "Gives this help list" };
+
+    protected:
+
+        ParserBuilder& builder() {
+            return builder_;
+        }
+    public:
+        Parameters() {
+            builder_.op.emplace_back(help, [](std::string_view arg) {
+                    //print the help commands, (then exit?)
+                });
+        }
+
+        void parse(int argc, char** argv)
+        {
+            int current_positional_arg = 0;
+
+            if (argv && argc > 1) {
+
+                for (int i = 1; i < argc; ++i) {
+                    std::string_view arg = argv[i];
+                    // which command
+                    //      is it a short_key or long_key?
+                    // what do we do with it?
+                    auto is_long_key = arg.starts_with("--");
+                    auto is_short_key = arg.starts_with("-") && arg.size() >= 2;
+                    
+                    if (is_long_key) {
+                        //handle long key
+                        auto long_op = std::find_if(builder_.op.begin(), builder_.op.end(), [&arg](const auto& op) {
+                            
+                            auto long_key_bound = arg.find_first_of('=', 2);
+
+                            if (long_key_bound == std::string_view::npos) long_key_bound = arg.size() - 2;
+
+                            return arg.substr(2, long_key_bound).compare(op.c.long_key) == 0 && op.c.long_key.size() != 0;
+                        });
+
+                        if (long_op == builder_.op.end()) {
+                            //log error
+                        }
+
+                        long_op->callback(arg.substr(2 + long_op->c.long_key.size() + 1)); // "--" + "<key>" + "="
+                    }
+                    else if (is_short_key)
+                    {
+                        //handle short key
+                        auto short_op = std::find_if(builder_.op.begin(), builder_.op.end(), [&arg](const auto& op) {
+                            return arg.at(1) == op.c.short_key;
+                        });
+
+                        if (short_op == builder_.op.end()) {
+                            //log error
+                        }
+
+                        short_op->callback(arg.substr(2));
+                    }
+                    else
+                    {
+                        builder_.positionals.at(current_positional_arg++)(arg); // handle error
+                        //handle positional argument
+                    }
+                }
+
+            }
+
+
+        }
+
+    };
+
+    template <typename ParameterType>
+    concept ValidParametersImplementation = std::is_base_of_v<Parameters, ParameterType>;
+
+    template <ValidParametersImplementation ValidParameters>
+    [[nodiscard]] ValidParameters parse(int argc, char** argv)
+    {
+        ValidParameters parameters { };
+        parameters.parse(argc, argv);
+
+        return parameters;
+    }
+
+}
+
+struct LemonParameters : options::Parameters {
+    //optional argument
+    // -b    basisflag   "..."
+    options::flag basisflag                         = {builder(), {.short_key = 'b', .doc = "Print only the basis in report."} };
+    options::flag compress                          = {builder(), {.short_key = 'c', .doc = "Don't compress the action table."} };
+    options::parameter<std::string> handle_d_option = {builder(), {.short_key = 'd', .doc = "Output directory.  Default '.'"} };
+    options::parameter<std::string> handle_D_option = {builder(), {.short_key = 'D', .doc = "Define an %ifdef macro."} };
+    options::flag printPP                           = {builder(), {.short_key = 'E', .doc = "Print input file after preprocessing."} };
+    options::flag rpflag                            = {builder(), {.short_key = 'g', .doc = "Print grammar without actions."} };
+    options::flag mhflag                            = {builder(), {.short_key = 'm', .doc = "Output a makeheaders compatible file."} };
+    options::flag nolinenosflag                     = {builder(), {.short_key = 'l', .doc = "Do not print #line statements."} };
+    options::flag showPrecedenceConflict            = {builder(), {.short_key = 'p', .doc = "Show conflicts resolved by precedence rules"} };
+    options::flag quiet                             = {builder(), {.short_key = 'q', .doc = "(Quiet) Don't print the report file."} };
+    options::flag noResort                          = {builder(), {.short_key = 'r', .doc = "Do not sort or renumber states"} };
+    options::flag statistics                        = {builder(), {.short_key = 's', .doc = "Print parser stats to standard output."} };
+    options::flag sqlFlag                           = {builder(), {.short_key = 'S', .doc = "Generate the *.sql file describing the parser tables."} };
+    options::flag version                           = {builder(), {.short_key = 'x', .long_key = "version"sv, .doc = "Print the version number."} };
+    options::parameter<std::string> handle_T_option = {builder(), {.short_key = 'T', .doc = "Specify a template file."} };
+
+
+    //positional
+    //  required grammar_file
+    options::argument<std::string> grammar_file     = {builder() }; //positional argument
+
+    //options::flag x = { {.short_key = 'f', .doc = "Ignored.  (Placeholder for -f compiler options.)"} };
+    //options::flag x = { {.short_key = 'I', .doc = "Ignored.  (Placeholder for -I compiler options.)"} };
+    //options::flag x = { {.short_key = 'O', .doc = "Ignored.  (Placeholder for -O compiler options.)"} };
+    //options::flag x = { {.short_key = 'W', .doc = "Ignored.  (Placeholder for -W compiler options.)"} };
+
+};
+
+
 
 /* The main program.  Parse the command line and do it... */
 int main(int argc, char** argv) {
+
+    const auto params = options::parse<LemonParameters>(argc, argv);
+
     static int version = 0;
     static int rpflag = 0;
     static int basisflag = 0;
@@ -1963,7 +2194,7 @@ int OptInit(char*& a)
     return 0;
 }
 
-int OptNArgs(void) {
+int OptNArgs() {
     int cnt = 0;
     int dashdash = 0;
     int i;
@@ -2017,7 +2248,7 @@ void OptPrint() {
 
     std::for_each(op.begin(), op.end(), [&](const auto& e) {
         std::cerr << "  -" << e.label << std::setw(max - strlen(e.label)) << type_name(e.type) << "   " << e.message << "\n";
-    });
+    }); 
 }
 /*********************** From the file "parse.c" ****************************/
 /*
